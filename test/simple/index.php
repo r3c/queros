@@ -69,13 +69,21 @@ $router = new Queros\Router (array
 
 try
 {
-	$router->dispatch ($_GET['route']);
+	$router->dispatch ($_GET['route'])->send ();
+}
+catch (Queros\HTTPException $exception)
+{
+	ob_end_clean ();
+
+	$exception->send ();
+
+	echo "HTTP exception: " . $exception->get_status ();
 }
 catch (Exception $exception)
 {
 	ob_end_clean ();
 
-	echo $exception;
+	throw $exception;
 }
 
 ?>

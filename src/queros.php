@@ -25,24 +25,36 @@ class	HTTPException extends \Exception
 		501	=> 'Not Implemented'
 	);
 
-	public function	__construct ($status, $message = null)
+	private	$status;
+
+	public function	__construct ($status, $message = '')
 	{
-		if ($message !== null)
-			$this->message = $message;
-		else if (isset (self::$statuses[$status]))
-			$this->message = self::$statuses[$status];
-		else
-			$this->message = '';
+		parent::__construct ($message);
 
 		$this->status = $status;
 	}
 
-	public function	send ()
+	public function	get_header ()
 	{
 		if (isset (self::$statuses[$this->status]))
-			header ('HTTP/1.1 ' . $this->status . ' ' . self::$statuses[$this->status]);
+			return 'HTTP/1.1 ' . $this->status . ' ' . self::$statuses[$this->status];
 		else
-			header ('HTTP/1.1 ' . $this->status);
+			return 'HTTP/1.1 ' . $this->status;
+	}
+
+	public function	get_message ()
+	{
+		return $this->message;
+	}
+
+	public function	get_status ()
+	{
+		return $this->status;
+	}
+
+	public function	send ()
+	{
+		header ($this->get_header ());
 
 		echo $this->message;
 	}
@@ -50,10 +62,23 @@ class	HTTPException extends \Exception
 
 class	HTTPReply
 {
+	private	$content;
+	private $headers;
+
 	public function	__construct ($content, $headers = array ())
 	{
 		$this->content = $content;
 		$this->headers = $headers;
+	}
+
+	public function	get_content ()
+	{
+		return $this->content;
+	}
+
+	public function	get_headers ()
+	{
+		return $this->headers;
 	}
 
 	public function	send ()
@@ -117,17 +142,7 @@ class	Router
 
 	public function	dispatch ($path)
 	{
-		try
-		{
-			$reply = $this->reply ($this->routes, $path);
-			$reply->send ();
-		}
-		catch (HTTPException $error)
-		{
-			$error->send ();
-		}
-
-		exit;
+		return $this->reply ($this->routes, $path);
 	}
 
 	public function	resolve ($name)
