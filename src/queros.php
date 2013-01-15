@@ -60,7 +60,7 @@ class	HTTPException extends \Exception
 	}
 }
 
-class	HTTPReply
+class	HTTPResponse
 {
 	private	$content;
 	private $headers;
@@ -92,114 +92,311 @@ class	HTTPReply
 
 class	Router
 {
-	private $handlers;
-	private	$readers;
-	private $routes;
+	const	CONSTANT = 0;
+	const	DELIMITER = '/';
+	const	ESCAPE = '\\';
+	const	OPTION = 1;
+	const	OPTION_BEGIN = '(';
+	const	OPTION_END = ')';
+	const	PARAM = 2;
+	const	PARAM_ARGUMENT = ':';
+	const	PARAM_BEGIN = '<';
+	const	PARAM_END = '>';
+	const	RESOLVE_LEAF = 0;
+	const	RESOLVE_NODE = 1;
 
-	public function	__construct ($routes)
+	private $callbacks;
+	private $resolvers;
+	private $reversers;
+
+	public function	__construct ($source, $cache = null)
 	{
-		$this->handlers = array
-		(
-			'call'	=> function ($params, $function)
+		// Build resolvers and reversers from route
+		if ($cache !== null && file_exists ($cache))
+			require ($cache);
+		else
+		{
+			// Load routes and convert to resolvers and reversers
+			if (is_string ($source))
+				require ($source);
+			else
+				$routes = $source;
+
+			if (!is_array ($routes))
+				throw new \Exception ('unable to load routes from source');
+
+			$resolvers = array ();
+			$reversers = array ();
+
+			self::convert ($resolvers, $reversers, $routes, '', array ());
+
+			// Save to cache
+			if ($cache !== null)
 			{
-				return call_user_func_array ($function, $params);
-			},
-			'file'	=> function ($params, $path, $function)
+				$contents = '<?php ' .
+					'$resolvers = ' . var_export ($resolvers, true) . '; ' .
+					'$reversers = ' . var_export ($reversers, true) . '; ' .
+				'?>';
+
+				if (file_put_contents ($cache, $contents, LOCK_EX) === false)
+					throw new \Exception ('unable to create cache');
+			}
+		}
+
+		// Check variable consistency
+		if (!isset ($resolvers))
+			throw new \Exception ('missing $resolvers variable in cache');
+
+		if (!isset ($reversers))
+			throw new \Exception ('missing $reversers variable in cache');
+
+		// Assign default callbacks
+		$this->callbacks = array
+		(
+			'file'	=> function ($arguments, $path, $function)
 			{
 				require ($path);
 
-				return call_user_func_array ($function, $params);
+				return call_user_func_array ($function, $arguments);
+			},
+			'func'	=> function ($arguments, $function)
+			{
+				return call_user_func_array ($function, $arguments);
 			}
 		);
 
-		$this->readers = array
-		(
-			'get'	=> function ($match, $key, $default = null)
-			{
-				if (isset ($_GET[$key]))
-					return $_GET[$key];
-
-				return $default;
-			},
-			'match'	=> function ($match, $group, $default = null)
-			{
-				if (isset ($match[$group]))
-					return $match[$group];
-
-				return $default;
-			},
-			'post'	=> function ($match, $key, $default = null)
-			{
-				if (isset ($_POST[$key]))
-					return $_POST[$key];
-
-				return $default;
-			}
-		);
-
-		$this->routes = $routes;
+		// Keep reference to resolvers and reversers
+		$this->resolvers = $resolvers;
+		$this->reversers = $reversers;		
 	}
 
-	public function	dispatch ($path)
+	public function	call ($path, $custom = null)
 	{
-		return $this->reply ($this->routes, $path);
+		return $this->resolve ($this->resolvers, $path, $custom, array ());
 	}
 
-	public function	resolve ($name)
+	public function	uri ($name, $params = array ())
 	{
-		return 'FIXME_not_implemented';
+		if (!isset ($this->reversers[$name]))
+			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
+
+		return self::reverse ($this->reversers[$name], $params);
 	}
 
-	public function	set_handler ($type, $callback)
+	private static function	convert (&$resolvers, &$reversers, $routes, $prefix, $reverser)
 	{
-		$this->handlers[$type] = $callback;
-	}
-
-	public function	set_reader ($type, $callback)
-	{
-		$this->readers[$type] = $callback;
-	}
-
-	private function	reply ($routes, $path)
-	{
-		foreach ($routes as $route)
+		foreach ($routes as $suffix => $route)
 		{
-			if (preg_match ($route[0], $path, $match) === 1)
+			$name = $prefix . $suffix;
+			$params = array ();
+			$i = 0;
+
+			$fragments = self::fragment ($route[0], $i);
+			$pattern = self::generate ($fragments, $params);
+
+			if (is_array ($route[1]))
 			{
-				if (is_array ($route[1]))
-					return $this->reply ($route[1], substr ($path, strlen ($match[0])));
+				$children = array ();
 
-				$params = array ($this);
+				self::convert ($children, $reversers, $route[1], $name, array_merge ($reverser, $fragments));
 
-				if (isset ($route[2]))
-				{
-					foreach ($route[2] as $expr)
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $params, self::RESOLVE_NODE, $children);
+			}
+			else
+			{
+				$callback = explode (':', $route[1]);
+
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $params, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
+				$reversers[$name] = array_merge ($reverser, $fragments);
+			}
+		}
+	}
+
+	private static function	fragment ($string, &$i)
+	{
+		$fragments = array ();
+		$length = strlen ($string);
+
+		while ($i < $length && $string[$i] !== self::OPTION_END)
+		{
+			switch ($string[$i])
+			{
+				case self::OPTION_BEGIN:
+					++$i;
+
+					$sequence = self::fragment ($string, $i);
+
+					if ($i >= $length || $string[$i] !== self::OPTION_END)
+						throw new \Exception ('unfinished optional sub-sequence');
+
+					$fragments[] = array (self::OPTION, $sequence);
+
+					++$i;
+
+					break;
+
+				case self::PARAM_BEGIN:
+					$key = '';
+
+					for (++$i; $i < $length && $string[$i] !== self::PARAM_ARGUMENT && $string[$i] !== self::PARAM_END; ++$i)
 					{
-						$options = explode (':', $expr);
+						if ($string[$i] === self::ESCAPE && $i + 1 < $length)
+							++$i;
 
-						if (!isset ($this->readers[$options[0]]))
-							throw new HTTPException (500, 'Unknown reader type "' . $options[0] . '"');
-
-						$context = array_merge (array ($match), array_slice ($options, 1));
-						$reader = $this->readers[$options[0]];
-
-						$params[] = call_user_func_array ($reader, $context);
+						$key .= $string[$i];
 					}
+
+					if ($i < $length && $string[$i] === self::PARAM_ARGUMENT)
+					{
+						$pattern = '';
+
+						for (++$i; $i < $length && $string[$i] !== self::PARAM_ARGUMENT && $string[$i] !== self::PARAM_END; ++$i)
+						{
+							if ($string[$i] === self::ESCAPE && $i + 1 < $length)
+								++$i;
+
+							$pattern .= $string[$i];
+						}
+					}
+					else
+						$pattern = '.+';
+
+					if ($i < $length && $string[$i] === self::PARAM_ARGUMENT)
+					{
+						$default = '';
+
+						for (++$i; $i < $length && $string[$i] !== self::PARAM_ARGUMENT && $string[$i] !== self::PARAM_END; ++$i)
+						{
+							if ($string[$i] === self::ESCAPE && $i + 1 < $length)
+								++$i;
+
+							$default .= $string[$i];
+						}
+					}
+					else
+						$default = null;
+
+					if ($i >= $length || $string[$i] !== self::PARAM_END)
+						throw new \Exception ('unfinished parameter name');
+
+					$fragments[] = array (self::PARAM, $key, $pattern, $default);
+
+					++$i;
+
+					break;
+
+				default:
+					$buffer = '';
+
+					for (; $i < $length && $string[$i] !== self::OPTION_BEGIN && $string[$i] !== self::OPTION_END && $string[$i] !== self::PARAM_BEGIN; ++$i)
+					{
+						if ($string[$i] === self::ESCAPE && $i + 1 < $length)
+							++$i;
+
+						$buffer .= $string[$i];
+					}
+
+					$fragments[] = array (self::CONSTANT, $buffer);
+
+					break;
+			}
+		}
+
+		return $fragments;
+	}
+
+	private static function	generate ($fragments, &$params)
+	{
+		$pattern = '';
+
+		foreach ($fragments as $fragment)
+		{
+			switch ($fragment[0])
+			{
+				case self::CONSTANT:
+					$pattern .= preg_quote ($fragment[1], self::DELIMITER);
+
+					break;
+
+				case self::OPTION:
+					$pattern .= '(?:' . self::generate ($fragment[1], $params) . ')?';
+
+					break;
+
+				case self::PARAM:
+					$pattern .= '(' . $fragment[2] . ')';
+
+					$params[$fragment[1]] = array (count ($params) + 1, $fragment[3]);
+
+					break;
+			}
+		}
+
+		return $pattern;
+	}
+
+	private function	resolve ($resolvers, $path, $custom, $params)
+	{
+		foreach ($resolvers as $resolver)
+		{
+			if (preg_match ($resolver[0], $path, $match) === 1)
+			{
+				foreach ($resolver[1] as $key => $param)
+					$params[$key] = isset ($match[$param[0]]) ? $match[$param[0]] : $param[1];
+
+				switch ($resolver[2])
+				{
+					case self::RESOLVE_LEAF:
+						$name = $resolver[3];
+
+						if (!isset ($this->callbacks[$name]))
+							throw new HTTPException (500, 'Unknown callback type "' . $name . '"');
+
+						$arguments = array_merge (array (array ($this, $custom, $params)), $resolver[4]);
+						$callback = $this->callbacks[$name];
+
+						return call_user_func_array ($callback, $arguments);
+
+					case self::RESOLVE_NODE:
+						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $custom, $params);
 				}
 
-				$options = explode (':', $route[1]);
-
-				if (!isset ($this->handlers[$options[0]]))
-					throw new HTTPException (500, 'Unknown handler type "' . $option[0] . '"');
-
-				$context = array_merge (array ($params), array_slice ($options, 1));
-				$handler = $this->handlers[$options[0]];
-
-				return call_user_func_array ($handler, $context);
+				throw new HTTPException (500, 'Configuration error');
 			}
 		}
 
 		throw new HTTPException (404);
+	}
+
+	private static function	reverse ($fragments, $params)
+	{
+		$uri = '';
+
+		foreach ($fragments as $fragment)
+		{
+			switch ($fragment[0])
+			{
+				case self::CONSTANT:
+					$uri .= $fragment[1];
+
+					break;
+
+				case self::OPTION:
+					$uri .= self::reverse ($fragment[1], $params);
+
+					break;
+
+				case self::PARAM:
+					if (!isset ($params[$fragment[1]]))
+						return '';
+
+					$uri .= $params[$fragment[1]];
+
+					break;
+			}
+		}
+
+		return $uri;
 	}
 }
 
