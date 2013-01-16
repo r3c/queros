@@ -8,12 +8,10 @@ namespace Queros;
 
 define ('QUEROS',	'1.0.0.0');
 
-class	HTTPException extends \Exception
+class	Exception extends \Exception
 {
 	private static	$statuses = array
 	(
-		301	=> 'Moved Permanently',
-		302	=> 'Found',
 		400	=> 'Bad Request',
 		401	=> 'Unauthorized',
 		403	=> 'Forbidden',
@@ -25,12 +23,15 @@ class	HTTPException extends \Exception
 		501	=> 'Not Implemented'
 	);
 
+	private	$reply;
 	private	$status;
 
-	public function	__construct ($status, $message = '')
+	public function	__construct ($status, $reply = null)
 	{
-		parent::__construct ($message);
+		if ($reply !== null)
+			parent::__construct ($reply->get_contents ());
 
+		$this->reply = $reply;
 		$this->status = $status;
 	}
 
@@ -42,9 +43,9 @@ class	HTTPException extends \Exception
 			return 'HTTP/1.1 ' . $this->status;
 	}
 
-	public function	get_message ()
+	public function	get_reply ()
 	{
-		return $this->message;
+		return $this->reply;
 	}
 
 	public function	get_status ()
@@ -56,24 +57,34 @@ class	HTTPException extends \Exception
 	{
 		header ($this->get_header ());
 
-		echo $this->message;
+		if ($this->reply !== null)
+			$this->reply->send ();
 	}
 }
 
-class	HTTPResponse
+abstract class	Reply
 {
-	private	$content;
+	public abstract function	get_contents ();
+
+	public abstract function	get_headers ();
+
+	public abstract function	send ();
+}
+
+class	ContentsReply extends Reply
+{
+	private	$contents;
 	private $headers;
 
-	public function	__construct ($content, $headers = array ())
+	public function	__construct ($contents = null, $headers = array ())
 	{
-		$this->content = $content;
+		$this->contents = $contents;
 		$this->headers = $headers;
 	}
 
-	public function	get_content ()
+	public function	get_contents ()
 	{
-		return $this->content;
+		return $this->contents;
 	}
 
 	public function	get_headers ()
@@ -86,7 +97,50 @@ class	HTTPResponse
 		foreach ($this->headers as $name => $value)
 			header ($name . ': ' . $value);
 
-		echo $this->content;
+		if ($this->contents !== null)
+			echo $this->contents;
+	}
+}
+
+class	RedirectReply extends Reply
+{
+	private	$url;
+
+	public function	__construct ($url)
+	{
+		$this->url = $url;
+	}
+
+	public function	get_contents ()
+	{
+		return null;
+	}
+
+	public function	get_headers ()
+	{
+		return array ('Location' => $this->url);
+	}
+
+	public function	send ()
+	{
+		header ('Location: ' . $this->url);
+	}
+}
+
+class	VoidReply extends Reply
+{
+	public function	get_contents ()
+	{
+		return null;
+	}
+
+	public function	get_headers ()
+	{
+		return array ();
+	}
+
+	public function	send ()
+	{
 	}
 }
 
@@ -162,6 +216,10 @@ class	Router
 			'func'	=> function ($arguments, $function)
 			{
 				return call_user_func_array ($function, $arguments);
+			},
+			'void'	=> function ()
+			{
+				return new VoidReply ();
 			}
 		);
 
@@ -172,15 +230,41 @@ class	Router
 
 	public function	call ($path, $custom = null)
 	{
-		return $this->resolve ($this->resolvers, $path, $custom, array ());
+		$reply = $this->resolve ($this->resolvers, $path, $custom, $_GET);
+
+		if ($reply !== null)
+			return $reply;
+
+		throw new Exception (500, new ContentsReply ('Handler for path "' . $path . '" did not return a valid reply'));
 	}
 
-	public function	uri ($name, $params = array ())
+	public function	url ($name, $params = array ())
 	{
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
 
-		return self::reverse ($this->reversers[$name], $params);
+		$keys = array ();
+		$url = self::reverse ($this->reversers[$name], $params, $keys);
+
+		$next = false;
+
+		foreach ($params as $key => $value)
+		{
+			if (!isset ($keys[$key]))
+			{
+				if ($next)
+					$url .= '&';
+				else
+				{
+					$next = true;
+					$url .= '?';
+				}
+
+				$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
+			}
+		}
+
+		return $url;
 	}
 
 	private static function	convert (&$resolvers, &$reversers, $routes, $prefix, $reverser)
@@ -350,7 +434,7 @@ class	Router
 						$name = $resolver[3];
 
 						if (!isset ($this->callbacks[$name]))
-							throw new HTTPException (500, 'Unknown callback type "' . $name . '"');
+							throw new Exception (500, new ContentsReply ('Unknown handler type "' . $name . '"'));
 
 						$arguments = array_merge (array (array ($this, $custom, $params)), $resolver[4]);
 						$callback = $this->callbacks[$name];
@@ -361,42 +445,48 @@ class	Router
 						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $custom, $params);
 				}
 
-				throw new HTTPException (500, 'Configuration error');
+				throw new Exception (500, new ContentsReply ('Unknown configuration error'));
 			}
 		}
 
-		throw new HTTPException (404);
+		throw new Exception (404, new ContentsReply ('No page found for path "' . $path . '"'));
 	}
 
-	private static function	reverse ($fragments, $params)
+	private static function	reverse ($fragments, $params, &$keys)
 	{
-		$uri = '';
+		$active = true;
+		$url = '';
 
 		foreach ($fragments as $fragment)
 		{
 			switch ($fragment[0])
 			{
 				case self::CONSTANT:
-					$uri .= $fragment[1];
+					$url .= $fragment[1];
 
 					break;
 
 				case self::OPTION:
-					$uri .= self::reverse ($fragment[1], $params);
+					$url .= self::reverse ($fragment[1], $params, $keys);
 
 					break;
 
 				case self::PARAM:
-					if (!isset ($params[$fragment[1]]))
-						return '';
+					if (isset ($params[$fragment[1]]))
+						$url .= $params[$fragment[1]];
+					else
+						$active = false;
 
-					$uri .= $params[$fragment[1]];
+					$keys[$fragment[1]] = true;
 
 					break;
 			}
 		}
 
-		return $uri;
+		if ($active)
+			return $url;
+
+		return '';
 	}
 }
 
