@@ -228,9 +228,9 @@ class	Router
 		$this->reversers = $reversers;		
 	}
 
-	public function	call ($path, $custom = null)
+	public function	call ($path, $params = array ())
 	{
-		$reply = $this->resolve ($this->resolvers, $path, $custom, $_GET);
+		$reply = $this->resolve ($this->resolvers, $path, array_merge ($_GET, $params));
 
 		if ($reply !== null)
 			return $reply;
@@ -419,7 +419,7 @@ class	Router
 		return $pattern;
 	}
 
-	private function	resolve ($resolvers, $path, $custom, $params)
+	private function	resolve ($resolvers, $path, $params)
 	{
 		foreach ($resolvers as $resolver)
 		{
@@ -436,13 +436,13 @@ class	Router
 						if (!isset ($this->callbacks[$name]))
 							throw new Exception (500, new ContentsReply ('Unknown handler type "' . $name . '"'));
 
-						$arguments = array_merge (array (array ($this, $custom, $params)), $resolver[4]);
+						$arguments = array_merge (array (array ($this, $params)), $resolver[4]);
 						$callback = $this->callbacks[$name];
 
 						return call_user_func_array ($callback, $arguments);
 
 					case self::RESOLVE_NODE:
-						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $custom, $params);
+						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $params);
 				}
 
 				throw new Exception (500, new ContentsReply ('Unknown configuration error'));

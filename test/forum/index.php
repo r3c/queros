@@ -4,7 +4,7 @@ isset ($_GET['route']) or die;
 
 require ('../../src/queros.php');
 
-function	handle_index ($router, $custom)
+function	handle_index ($router)
 {
 	return new Queros\ContentsReply ('<h1>Index page</h1>
 <ul>
@@ -13,14 +13,14 @@ function	handle_index ($router, $custom)
 </ul>');
 }
 
-function	handle_topic ($router, $custom, $params)
+function	handle_topic ($router, $params)
 {
 	return new Queros\ContentsReply ('<h1>Topic page</h1>
 <p>Reading topic #' . htmlspecialchars ($params['topic']) . ' on page n°' . htmlspecialchars ($params['page']) . '.</p>
 <a href="' . htmlspecialchars ($router->url ('index')) . '">Back</a>');
 }
 
-function	handle_post ($router, $custom, $params)
+function	handle_post ($router, $params)
 {
 	$content = '<h1>Post page</h1>';
 
