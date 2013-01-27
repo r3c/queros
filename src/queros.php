@@ -148,7 +148,7 @@ class	Router
 {
 	const	CONSTANT = 0;
 	const	DELIMITER = '/';
-	const	ESCAPE = '\\';
+	const	ESCAPE = '%';
 	const	OPTION = 1;
 	const	OPTION_BEGIN = '(';
 	const	OPTION_END = ')';

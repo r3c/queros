@@ -45,8 +45,8 @@ $router = new Queros\Router (array
 	'index'	=> array ('(index)',	'func:handle_index'),
 	'forum'	=> array ('forum-',		array
 	(
-		'.topic'		=> array ('topic-<topic:\\\\d+>(-<page:\\\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
-		'.post.edit'	=> array ('edit-post-<post:\\\\d+>',										'func:handle_post')
+		'.topic'		=> array ('topic-<topic:\\d+>(-<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
+		'.post.edit'	=> array ('edit-post-<post:\\d+>',										'func:handle_post')
 	))
 ));
 
