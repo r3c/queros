@@ -6,7 +6,7 @@
 
 namespace Queros;
 
-define ('QUEROS',	'1.0.0.0');
+define ('QUEROS',	'1.0.1.0');
 
 class	Exception extends \Exception
 {
@@ -54,6 +54,11 @@ class	Exception extends \Exception
 
 		if ($this->reply !== null)
 			$this->reply->send ();
+	}
+
+	public function	set_reply ($reply)
+	{
+		return $this->reply = $reply;
 	}
 }
 
