@@ -10,7 +10,7 @@ define ('QUEROS',	'1.0.0.0');
 
 class	Exception extends \Exception
 {
-	private static	$statuses = array
+	private static	$messages = array
 	(
 		400	=> 'Bad Request',
 		401	=> 'Unauthorized',
@@ -23,24 +23,21 @@ class	Exception extends \Exception
 		501	=> 'Not Implemented'
 	);
 
+	private	$error;
 	private	$reply;
-	private	$status;
 
-	public function	__construct ($status, $reply = null)
+	public function	__construct ($error, $reply = null)
 	{
 		if ($reply !== null)
 			parent::__construct ($reply->get_contents ());
 
+		$this->error = $error;
 		$this->reply = $reply;
-		$this->status = $status;
 	}
 
-	public function	get_header ()
+	public function	get_error ()
 	{
-		if (isset (self::$statuses[$this->status]))
-			return 'HTTP/1.1 ' . $this->status . ' ' . self::$statuses[$this->status];
-		else
-			return 'HTTP/1.1 ' . $this->status;
+		return $this->error;
 	}
 
 	public function	get_reply ()
@@ -48,14 +45,12 @@ class	Exception extends \Exception
 		return $this->reply;
 	}
 
-	public function	get_status ()
-	{
-		return $this->status;
-	}
-
 	public function	send ()
 	{
-		header ($this->get_header ());
+		if (isset (self::$messages[$this->error]))
+			header ('HTTP/1.1 ' . $this->error . ' ' . self::$messages[$this->error], false, $this->error);
+		else
+			header ('HTTP/1.1 ' . $this->error, false, $this->error);
 
 		if ($this->reply !== null)
 			$this->reply->send ();
@@ -104,10 +99,15 @@ class	ContentsReply extends Reply
 
 class	RedirectReply extends Reply
 {
+	const	PERMANENT = 301;
+	const	TEMPORARY = 307;
+
+	private $code;
 	private	$url;
 
-	public function	__construct ($url)
+	public function	__construct ($url, $code = 302)
 	{
+		$this->code = $code;
 		$this->url = $url;
 	}
 
@@ -123,7 +123,7 @@ class	RedirectReply extends Reply
 
 	public function	send ()
 	{
-		header ('Location: ' . $this->url);
+		header ('Location: ' . $this->url, false, $this->code);
 	}
 }
 
