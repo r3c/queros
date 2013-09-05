@@ -243,7 +243,7 @@ class	Router
 		throw new Exception (500, new ContentsReply ('Handler for path "' . $path . '" did not return a valid reply'));
 	}
 
-	public function	url ($name, $params = array ())
+	public function	url ($name, $params = array (), $anchor = null)
 	{
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
@@ -267,6 +267,9 @@ class	Router
 				$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
 			}
 		}
+
+		if ($anchor !== null)
+			$url .= '#' . rawurlencode ($anchor);
 
 		return $url;
 	}
