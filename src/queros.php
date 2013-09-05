@@ -6,7 +6,7 @@
 
 namespace Queros;
 
-define ('QUEROS',	'1.0.1.0');
+define ('QUEROS',	'1.0.2.0');
 
 class	Exception extends \Exception
 {
@@ -248,22 +248,21 @@ class	Router
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
 
+		$first = false;
 		$keys = array ();
 		$url = self::reverse ($this->reversers[$name], $params, $keys);
-
-		$next = false;
 
 		foreach ($params as $key => $value)
 		{
 			if (!isset ($keys[$key]))
 			{
-				if ($next)
-					$url .= '&';
-				else
+				if ($first)
 				{
-					$next = true;
+					$first = false;
 					$url .= '?';
 				}
+				else
+					$url .= '&';
 
 				$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
 			}
@@ -280,7 +279,7 @@ class	Router
 			$params = array ();
 			$i = 0;
 
-			$fragments = self::fragment ($route[0], $i);
+			$fragments = self::parse ($route[0], $i);
 			$pattern = self::generate ($fragments, $params);
 
 			if (is_array ($route[1]))
@@ -301,7 +300,36 @@ class	Router
 		}
 	}
 
-	private static function	fragment ($string, &$i)
+	private static function	generate ($fragments, &$params)
+	{
+		$pattern = '';
+
+		foreach ($fragments as $fragment)
+		{
+			switch ($fragment[0])
+			{
+				case self::CONSTANT:
+					$pattern .= preg_quote ($fragment[1], self::DELIMITER);
+
+					break;
+
+				case self::OPTION:
+					$pattern .= '(?:' . self::generate ($fragment[1], $params) . ')?';
+
+					break;
+
+				case self::PARAM:
+					$params[$fragment[1]] = count ($params) + 1;
+					$pattern .= '(' . $fragment[2] . ')';
+
+					break;
+			}
+		}
+
+		return $pattern;
+	}
+
+	private static function	parse ($string, &$i)
 	{
 		$fragments = array ();
 		$length = strlen ($string);
@@ -313,7 +341,7 @@ class	Router
 				case self::OPTION_BEGIN:
 					++$i;
 
-					$sequence = self::fragment ($string, $i);
+					$sequence = self::parse ($string, $i);
 
 					if ($i >= $length || $string[$i] !== self::OPTION_END)
 						throw new \Exception ('unfinished optional sub-sequence');
@@ -394,44 +422,14 @@ class	Router
 		return $fragments;
 	}
 
-	private static function	generate ($fragments, &$params)
-	{
-		$pattern = '';
-
-		foreach ($fragments as $fragment)
-		{
-			switch ($fragment[0])
-			{
-				case self::CONSTANT:
-					$pattern .= preg_quote ($fragment[1], self::DELIMITER);
-
-					break;
-
-				case self::OPTION:
-					$pattern .= '(?:' . self::generate ($fragment[1], $params) . ')?';
-
-					break;
-
-				case self::PARAM:
-					$pattern .= '(' . $fragment[2] . ')';
-
-					$params[$fragment[1]] = array (count ($params) + 1, $fragment[3]);
-
-					break;
-			}
-		}
-
-		return $pattern;
-	}
-
 	private function	resolve ($resolvers, $path, $params)
 	{
 		foreach ($resolvers as $resolver)
 		{
 			if (preg_match ($resolver[0], $path, $match) === 1)
 			{
-				foreach ($resolver[1] as $key => $param)
-					$params[$key] = isset ($match[$param[0]]) ? $match[$param[0]] : $param[1];
+				foreach ($resolver[1] as $key => $value)
+					$params[$key] = isset ($match[$value]) ? $match[$value] : null;
 
 				switch ($resolver[2])
 				{
@@ -459,7 +457,7 @@ class	Router
 
 	private static function	reverse ($fragments, $params, &$keys)
 	{
-		$active = true;
+		$set = true;
 		$url = '';
 
 		foreach ($fragments as $fragment)
@@ -479,8 +477,10 @@ class	Router
 				case self::PARAM:
 					if (isset ($params[$fragment[1]]))
 						$url .= $params[$fragment[1]];
+					else if ($fragment[3] !== null)
+						$url .= $fragment[3];
 					else
-						$active = false;
+						$set = false;
 
 					$keys[$fragment[1]] = true;
 
@@ -488,7 +488,7 @@ class	Router
 			}
 		}
 
-		if ($active)
+		if ($set)
 			return $url;
 
 		return '';
