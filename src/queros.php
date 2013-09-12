@@ -170,7 +170,7 @@ class	Router
 
 	public function	__construct ($source, $cache = null)
 	{
-		// Build resolvers and reversers from route
+		// Build or load resolvers and reversers from routes or cache
 		if ($cache !== null && file_exists ($cache))
 			require ($cache);
 		else
@@ -193,8 +193,8 @@ class	Router
 			if ($cache !== null)
 			{
 				$contents = '<?php ' .
-					'$resolvers = ' . var_export ($resolvers, true) . '; ' .
-					'$reversers = ' . var_export ($reversers, true) . '; ' .
+					'$resolvers = ' . self::export ($resolvers) . '; ' .
+					'$reversers = ' . self::export ($reversers) . '; ' .
 				'?>';
 
 				if (file_put_contents ($cache, $contents, LOCK_EX) === false)
@@ -228,7 +228,7 @@ class	Router
 			}
 		);
 
-		// Keep reference to resolvers and reversers
+		// Initialize members
 		$this->resolvers = $resolvers;
 		$this->reversers = $reversers;		
 	}
@@ -301,6 +301,21 @@ class	Router
 				$reversers[$name] = array_merge ($reverser, $fragments);
 			}
 		}
+	}
+
+	private static function	export ($value)
+	{
+		if (is_array ($value))
+		{
+			if (array_reduce (array_keys ($value), function (&$result, $item) { return $result === $item ? $item + 1 : null; }, 0) !== count ($value))
+				$callback = function ($key, $value) { return self::export ($key) . '=>' . self::export ($value); };
+			else
+				$callback = function ($key, $value) { return self::export ($value); };
+
+			return 'array(' . implode (',', array_map ($callback, array_keys ($value), array_values ($value))) . ')';
+		}
+
+		return var_export ($value, true);
 	}
 
 	private static function	generate ($fragments, &$params)
