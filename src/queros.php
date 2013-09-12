@@ -303,19 +303,27 @@ class	Router
 		}
 	}
 
-	private static function	export ($value)
+	private static function	export ($input)
 	{
-		if (is_array ($value))
+		if (is_array ($input))
 		{
-			if (array_reduce (array_keys ($value), function (&$result, $item) { return $result === $item ? $item + 1 : null; }, 0) !== count ($value))
-				$callback = function ($key, $value) { return self::export ($key) . '=>' . self::export ($value); };
-			else
-				$callback = function ($key, $value) { return self::export ($value); };
+			$out = '';
 
-			return 'array(' . implode (',', array_map ($callback, array_keys ($value), array_values ($value))) . ')';
+			if (array_reduce (array_keys ($input), function (&$result, $item) { return $result === $item ? $item + 1 : null; }, 0) !== count ($input))
+			{
+				foreach ($input as $key => $value)
+					$out .= ($out !== '' ? ',' : '') . self::export ($key) . '=>' . self::export ($value);
+			}
+			else
+			{
+				foreach ($input as $value)
+					$out .= ($out !== '' ? ',' : '') . self::export ($value);
+			}
+
+			return 'array(' . $out . ')';
 		}
 
-		return var_export ($value, true);
+		return var_export ($input, true);
 	}
 
 	private static function	generate ($fragments, &$params)
