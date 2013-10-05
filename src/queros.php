@@ -74,7 +74,7 @@ class	Error extends \Exception
 class	Redirect extends Answer
 {
 	const PERMANENT	= 301;
-	const UNKNOWN	= 302;
+	const FOUND		= 302;
 	const PROXY		= 305;
 	const TEMPORARY	= 307;
 
@@ -218,9 +218,12 @@ class	Router
 		$this->reversers = $reversers;		
 	}
 
-	public function	call ($path, $params = array ())
+	public function	call ($path, $parameters = null, $internals = array ())
 	{
-		$reply = $this->resolve ($this->resolvers, $path, array_merge ($_GET, $params));
+		if ($parameters === null)
+			$parameters = $_GET;
+
+		$reply = $this->resolve ($this->resolvers, $path, $parameters, $internals);
 
 		if ($reply !== null)
 			return $reply;
@@ -228,16 +231,16 @@ class	Router
 		throw new Error (500, new Reply ('Handler for path "' . $path . '" did not return a valid reply'));
 	}
 
-	public function	url ($name, $params = array (), $anchor = null)
+	public function	url ($name, $parameters = array (), $anchor = null)
 	{
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
 
 		$first = false;
 		$keys = array ();
-		$url = self::reverse ($this->reversers[$name], $params, $keys);
+		$url = self::reverse ($this->reversers[$name], $parameters, $keys);
 
-		foreach ($params as $key => $value)
+		foreach ($parameters as $key => $value)
 		{
 			if (!isset ($keys[$key]))
 			{
@@ -264,11 +267,11 @@ class	Router
 		foreach ($routes as $suffix => $route)
 		{
 			$name = $prefix . $suffix;
-			$params = array ();
+			$parameters = array ();
 			$i = 0;
 
 			$fragments = self::parse ($route[0], $i);
-			$pattern = self::generate ($fragments, $params);
+			$pattern = self::generate ($fragments, $parameters);
 
 			if (is_array ($route[1]))
 			{
@@ -276,13 +279,13 @@ class	Router
 
 				self::convert ($children, $reversers, $route[1], $name, array_merge ($reverser, $fragments));
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $params, self::RESOLVE_NODE, $children);
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $parameters, self::RESOLVE_NODE, $children);
 			}
 			else
 			{
 				$callback = explode (':', $route[1]);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $params, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $parameters, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
 				$reversers[$name] = array_merge ($reverser, $fragments);
 			}
 		}
@@ -311,7 +314,7 @@ class	Router
 		return var_export ($input, true);
 	}
 
-	private static function	generate ($fragments, &$params)
+	private static function	generate ($fragments, &$parameters)
 	{
 		$pattern = '';
 
@@ -325,12 +328,12 @@ class	Router
 					break;
 
 				case self::OPTION:
-					$pattern .= '(?:' . self::generate ($fragment[1], $params) . ')?';
+					$pattern .= '(?:' . self::generate ($fragment[1], $parameters) . ')?';
 
 					break;
 
 				case self::PARAM:
-					$params[$fragment[1]] = count ($params) + 1;
+					$parameters[$fragment[1]] = count ($parameters) + 1;
 					$pattern .= '(' . $fragment[2] . ')';
 
 					break;
@@ -433,14 +436,14 @@ class	Router
 		return $fragments;
 	}
 
-	private function	resolve ($resolvers, $path, $params)
+	private function	resolve ($resolvers, $path, $parameters, $internals)
 	{
 		foreach ($resolvers as $resolver)
 		{
 			if (preg_match ($resolver[0], $path, $match) === 1)
 			{
 				foreach ($resolver[1] as $key => $value)
-					$params[$key] = isset ($match[$value]) ? $match[$value] : null;
+					$parameters[$key] = isset ($match[$value]) ? $match[$value] : null;
 
 				switch ($resolver[2])
 				{
@@ -450,13 +453,13 @@ class	Router
 						if (!isset ($this->callbacks[$name]))
 							throw new Error (500, new Reply ('Unknown handler type "' . $name . '"'));
 
-						$arguments = array_merge (array (array ($this, $params)), $resolver[4]);
+						$arguments = array_merge (array (array_merge (array ($this, $parameters), $internals)), $resolver[4]);
 						$callback = $this->callbacks[$name];
 
 						return call_user_func_array ($callback, $arguments);
 
 					case self::RESOLVE_NODE:
-						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $params);
+						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $parameters, $internals);
 				}
 
 				throw new Error (500, new Reply ('Unknown configuration error'));
@@ -466,7 +469,7 @@ class	Router
 		throw new Error (404, new Reply ('No page found for path "' . $path . '"'));
 	}
 
-	private static function	reverse ($fragments, $params, &$keys)
+	private static function	reverse ($fragments, $parameters, &$keys)
 	{
 		$set = true;
 		$url = '';
@@ -481,13 +484,13 @@ class	Router
 					break;
 
 				case self::OPTION:
-					$url .= self::reverse ($fragment[1], $params, $keys);
+					$url .= self::reverse ($fragment[1], $parameters, $keys);
 
 					break;
 
 				case self::PARAM:
-					if (isset ($params[$fragment[1]]))
-						$url .= $params[$fragment[1]];
+					if (isset ($parameters[$fragment[1]]))
+						$url .= $parameters[$fragment[1]];
 					else if ($fragment[3] !== null)
 						$url .= $fragment[3];
 					else
