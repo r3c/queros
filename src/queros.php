@@ -156,9 +156,7 @@ class	Router
 	public function	__construct ($source, $cache = null)
 	{
 		// Build or load resolvers and reversers from routes or cache
-		if ($cache !== null && file_exists ($cache))
-			require ($cache);
-		else
+		if ($cache === null || (@include $cache) === false)
 		{
 			// Load routes and convert to resolvers and reversers
 			if (is_string ($source))
