@@ -153,7 +153,7 @@ class	Router
 	private $resolvers;
 	private $reversers;
 
-	public function	__construct ($source, $cache = null)
+	public function	__construct ($source, $parameters = array (), $cache = null)
 	{
 		// Build or load resolvers and reversers from routes or cache
 		if ($cache === null || (@include $cache) === false)
@@ -212,6 +212,7 @@ class	Router
 		);
 
 		// Initialize members
+		$this->parameters = $parameters;
 		$this->resolvers = $resolvers;
 		$this->reversers = $reversers;		
 	}
@@ -234,11 +235,11 @@ class	Router
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
 
-		$first = false;
+		$first = true;
 		$keys = array ();
 		$url = self::reverse ($this->reversers[$name], $parameters, $keys);
 
-		foreach ($parameters as $key => $value)
+		foreach (array_merge ($this->parameters, $parameters) as $key => $value)
 		{
 			if (!isset ($keys[$key]))
 			{
