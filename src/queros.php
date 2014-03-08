@@ -184,10 +184,11 @@ class	Router
 	const	RESOLVE_NODE = 1;
 
 	private $callbacks;
+	private $parameters;
 	private $resolvers;
 	private $reversers;
 
-	public function __construct ($source, $parameters = array (), $cache = null)
+	public function __construct ($source, $cache = null)
 	{
 		// Build or load resolvers and reversers from routes or cache
 		if ($cache === null || (@include $cache) === false)
@@ -248,7 +249,7 @@ class	Router
 		);
 
 		// Initialize members
-		$this->parameters = $parameters;
+		$this->parameters = array ();
 		$this->resolvers = $resolvers;
 		$this->reversers = $reversers;		
 	}
@@ -263,29 +264,32 @@ class	Router
 		return $this->resolve ($this->resolvers, $path, array ());
 	}
 
+	public function stick ($parameters)
+	{
+		$this->parameters = $parameters;
+	}
+
 	public function url ($name, $parameters = array (), $anchor = null)
 	{
 		if (!isset ($this->reversers[$name]))
-			throw new \Exception ('can\'t create link to unknown route "' . $name . '"');
+			throw new \Exception ('can\'t create URL to unknown route "' . $name . '"');
+
+		$remains = array_merge ($this->parameters, $parameters);
+		$url = self::reverse ($this->reversers[$name], $remains);
 
 		$first = true;
-		$keys = array ();
-		$url = self::reverse ($this->reversers[$name], $parameters, $keys);
 
-		foreach (array_merge ($this->parameters, $parameters) as $key => $value)
+		foreach ($remains as $key => $value)
 		{
-			if (!isset ($keys[$key]))
+			if ($first)
 			{
-				if ($first)
-				{
-					$first = false;
-					$url .= '?';
-				}
-				else
-					$url .= '&';
-
-				$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
+				$first = false;
+				$url .= '?';
 			}
+			else
+				$url .= '&';
+
+			$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
 		}
 
 		if ($anchor !== null)
@@ -476,10 +480,10 @@ class	Router
 	{
 		foreach ($resolvers as $resolver)
 		{
-			if (preg_match ($resolver[0], $path, $match) === 1)
+			if (preg_match ($resolver[0], $path, $match, PREG_OFFSET_CAPTURE) === 1)
 			{
 				foreach ($resolver[1] as $key => $value)
-					$parameters[$key] = isset ($match[$value]) ? $match[$value] : null;
+					$parameters[$key] = isset ($match[$value]) && $match[$value][1] !== -1 ? $match[$value][0] : null;
 
 				switch ($resolver[2])
 				{
@@ -492,7 +496,7 @@ class	Router
 						return new Invoke ($this, $this->callbacks[$name], $resolver[4], $parameters);
 
 					case self::RESOLVE_NODE:
-						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0])), $parameters);
+						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0][0])), $parameters);
 				}
 
 				throw new Error (500, new Reply ('Unknown configuration error'));
@@ -502,7 +506,7 @@ class	Router
 		throw new Error (404, new Reply ('No page found for path "' . $path . '"'));
 	}
 
-	private static function reverse ($fragments, $parameters, &$keys)
+	private static function reverse ($fragments, &$parameters)
 	{
 		$set = true;
 		$url = '';
@@ -517,7 +521,7 @@ class	Router
 					break;
 
 				case self::OPTION:
-					$url .= self::reverse ($fragment[1], $parameters, $keys);
+					$url .= self::reverse ($fragment[1], $parameters);
 
 					break;
 
@@ -529,7 +533,7 @@ class	Router
 					else
 						$set = false;
 
-					$keys[$fragment[1]] = true;
+					unset ($parameters[$fragment[1]]);
 
 					break;
 			}
