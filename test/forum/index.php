@@ -6,7 +6,7 @@ require ('../../src/queros.php');
 
 function	handle_index ($router)
 {
-	return new Queros\ContentsReply ('<h1>Index page</h1>
+	return new Queros\Reply ('<h1>Index page</h1>
 <ul>
 	<li><a href="' . htmlspecialchars ($router->url ('forum.topic', array ('topic' => 42, 'page' => 3))) . '">Go to topic #42 on page 3</a></li>
 	<li><a href="' . htmlspecialchars ($router->url ('forum.post.edit', array ('post' => 17))) . '">Edit post #17</a></li>
@@ -15,7 +15,7 @@ function	handle_index ($router)
 
 function	handle_topic ($router, $params)
 {
-	return new Queros\ContentsReply ('<h1>Topic page</h1>
+	return new Queros\Reply ('<h1>Topic page</h1>
 <p>Reading topic #' . htmlspecialchars ($params['topic']) . ' on page n°' . htmlspecialchars ($params['page']) . '.</p>
 <a href="' . htmlspecialchars ($router->url ('index')) . '">Back</a>');
 }
@@ -37,17 +37,20 @@ function	handle_post ($router, $params)
 
 	$content .= '<a href="' . htmlspecialchars ($router->url ('index')) . '">Back</a>';
 
-	return new Queros\ContentsReply ($content);
+	return new Queros\Reply ($content);
 }
 
 $router = new Queros\Router (array
 (
-	'index'	=> array ('(index)',	'func:handle_index'),
-	'forum'	=> array ('forum-',		array
+	'routes' => array
 	(
-		'.topic'		=> array ('topic-<topic:\\d+>(-<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
-		'.post.edit'	=> array ('edit-post-<post:\\d+>',										'func:handle_post')
-	))
+		'index'	=> array ('(index)',	'func:handle_index'),
+		'forum'	=> array ('forum-',		array
+		(
+			'.topic'		=> array ('topic-<topic:\\d+>(-<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
+			'.post.edit'	=> array ('edit-post-<post:\\d+>',										'func:handle_post')
+		))
+	)
 ));
 
 try

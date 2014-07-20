@@ -256,7 +256,7 @@ class	Router
 
 	public function call ($path, $parameters = array (), $internals = array ())
 	{
-		$this->find ($path)->call ($parameters, $internals);
+		return $this->find ($path)->call ($parameters, $internals);
 	}
 
 	public function find ($path)
@@ -302,8 +302,8 @@ class	Router
 	{
 		foreach ($routes as $child => $route)
 		{
+			$groups = array ();
 			$name = $parent . $child;
-			$parameters = array ();
 			$i = 0;
 
 			// Node has children, run recursive conversion
@@ -311,11 +311,11 @@ class	Router
 			{
 				$children = array ();
 				$fragments = self::parse ($route[0], $i);
-				$pattern = self::generate ($fragments, $parameters);
+				$pattern = self::generate ($fragments, $groups);
 
 				self::convert ($children, $reversers, $route[1], $name, $suffix, array_merge ($reverser, $fragments));
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $parameters, self::RESOLVE_NODE, $children);
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $groups, self::RESOLVE_NODE, $children);
 			}
 
 			// Leaf
@@ -323,9 +323,9 @@ class	Router
 			{
 				$callback = explode (':', $route[1]);
 				$fragments = self::parse ($route[0] . $suffix, $i);
-				$pattern = self::generate ($fragments, $parameters);
+				$pattern = self::generate ($fragments, $groups);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $parameters, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $groups, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
 				$reversers[$name] = array_merge ($reverser, $fragments);
 			}
 		}
@@ -354,7 +354,7 @@ class	Router
 		return var_export ($input, true);
 	}
 
-	private static function generate ($fragments, &$parameters)
+	private static function generate ($fragments, &$groups)
 	{
 		$pattern = '';
 
@@ -368,13 +368,13 @@ class	Router
 					break;
 
 				case self::OPTION:
-					$pattern .= '(?:' . self::generate ($fragment[1], $parameters) . ')?';
+					$pattern .= '(?:' . self::generate ($fragment[1], $groups) . ')?';
 
 					break;
 
 				case self::PARAM:
-					$parameters[$fragment[1]] = count ($parameters) + 1;
 					$pattern .= '(' . $fragment[2] . ')';
+					$groups[] = $fragment[1];
 
 					break;
 			}
@@ -482,8 +482,8 @@ class	Router
 		{
 			if (preg_match ($resolver[0], $path, $match, PREG_OFFSET_CAPTURE) === 1)
 			{
-				foreach ($resolver[1] as $key => $value)
-					$parameters[$key] = isset ($match[$value]) && $match[$value][1] !== -1 ? $match[$value][0] : null;
+				foreach ($resolver[1] as $index => $key)
+					$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : null;
 
 				switch ($resolver[2])
 				{
