@@ -4,7 +4,7 @@ isset ($_GET['route']) or die;
 
 require ('../../src/queros.php');
 
-function	handle_index ($router)
+function handle_index ($query, $router)
 {
 	return new Queros\Reply ('<h1>Index page</h1>
 <ul>
@@ -13,23 +13,24 @@ function	handle_index ($router)
 </ul>');
 }
 
-function	handle_topic ($router, $params)
+function handle_topic ($query, $router)
 {
 	return new Queros\Reply ('<h1>Topic page</h1>
-<p>Reading topic #' . htmlspecialchars ($params['topic']) . ' on page n°' . htmlspecialchars ($params['page']) . '.</p>
+<p>Reading topic #' . htmlspecialchars ($query->get_or_fail ('topic')) . ' on page n°' . htmlspecialchars ($query->get_or_fail ('page')) . '.</p>
 <a href="' . htmlspecialchars ($router->url ('index')) . '">Back</a>');
 }
 
-function	handle_post ($router, $params)
+function handle_post ($query, $router)
 {
 	$content = '<h1>Post page</h1>';
+	$text = $query->get_or_default ('text');
 
-	if (isset ($_POST['text']))
-		$content .= '<p>Post #' . htmlspecialchars ($params['post']) . ' has been updated with text "' . htmlspecialchars ($_POST['text']) . '".</p>';
+	if ($text !== null)
+		$content .= '<p>Post #' . htmlspecialchars ($query->get_or_fail ('post')) . ' has been updated with text "' . htmlspecialchars ($text) . '".</p>';
 	else
 	{
-		$content .= '<p>Editing post #' . htmlspecialchars ($params['post']) . ':</p>
-<form action="' . htmlspecialchars ($router->url ('forum.post.edit', $params)) . '" method="POST">
+		$content .= '<p>Editing post #' . htmlspecialchars ($query->get_or_fail ('post')) . ':</p>
+<form action="' . htmlspecialchars ($router->url ('forum.post.edit')) . '" method="POST">
 	<textarea name="text" cols="80" rows="6"></textarea><br />
 	<input type="submit" value="OK" />
 </form>';
@@ -55,7 +56,7 @@ $router = new Queros\Router (array
 
 try
 {
-	$router->call ($_GET['route'])->send ();
+	$router->call ($_GET['route'], $_REQUEST, array ($router))->send ();
 }
 catch (Queros\Exception $exception)
 {

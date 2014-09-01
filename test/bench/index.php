@@ -15,9 +15,10 @@ $router = new Queros\Router (array
 	)
 ));
 
+$count = 10000;
 $start = microtime (true);
 
-for ($i = 0; $i < 10000; ++$i)
+for ($i = 0; $i < $count; ++$i)
 {
 	$router->find ('');
 	$router->find ('index');
@@ -26,11 +27,14 @@ for ($i = 0; $i < 10000; ++$i)
 	$router->find ('forum/topic-42/5-titre-du-topic');
 }
 
-echo "find time: " . round ((microtime (true) - $start) * 1000 / 10000 / 5, 3) . " ms / find<br />";
+$delta = microtime (true) - $start;
 
+echo "find time: " . round (1 / $delta * $count * 5) . " calls/s, " . round ($delta * 1000 / $count / 5, 3) . " ms/call<br />";
+
+$count = 10000;
 $start = microtime (true);
 
-for ($i = 0; $i < 10000; ++$i)
+for ($i = 0; $i < $count; ++$i)
 {
 	$router->url ('index');
 	$router->url ('forum.topic', array ('topic' => 15, 'other' => 'key', 'in' => 'query-string'));
@@ -38,6 +42,8 @@ for ($i = 0; $i < 10000; ++$i)
 	$router->url ('forum.post.edit');
 }
 
-echo "url time: " . round ((microtime (true) - $start) * 1000 / 10000 / 4, 3) . " ms / url<br />";
+$delta = microtime (true) - $start;
+
+echo "url time: " . round (1 / $delta * $count * 4) . " calls/s, " . round ($delta * 1000 / $count / 4, 3) . " ms/call<br />";
 
 ?>

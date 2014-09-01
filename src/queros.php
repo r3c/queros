@@ -6,18 +6,23 @@
 
 namespace Queros;
 
-define ('QUEROS',	'1.0.3.0');
+define ('QUEROS', '1.0.3.0');
 
-abstract class	Answer
+abstract class Answer
 {
-	public abstract function	get_contents ();
+	public $contents;
+	public $headers;
 
-	public abstract function	get_headers ();
+	public function __construct ($contents = null, $headers = array ())
+	{
+		$this->contents = $contents;
+		$this->headers = $headers;
+	}
 
-	public abstract function	send ();
+	public abstract function send ();
 }
 
-class	Error extends \Exception
+class Error extends \Exception
 {
 	private static	$messages = array
 	(
@@ -32,132 +37,95 @@ class	Error extends \Exception
 		501	=> 'Not Implemented'
 	);
 
-	private	$answer;
-	private	$status;
+	public $answer;
+	public $code;
 
-	public function	__construct ($status, $answer = null)
+	public function	__construct ($code, $answer = null)
 	{
-		if ($answer !== null)
-			parent::__construct ($answer->get_contents ());
+		if ($answer !== null && $answer->contents !== null)
+			parent::__construct ($answer->contents);
 
 		$this->answer = $answer;
-		$this->status = $status;
-	}
-
-	public function	get_answer ()
-	{
-		return $this->answer;
-	}
-
-	public function	get_status ()
-	{
-		return $this->status;
+		$this->code = $code;
 	}
 
 	public function	send ()
 	{
-		if (isset (self::$messages[$this->status]))
-			header ('HTTP/1.1 ' . $this->status . ' ' . self::$messages[$this->status], false, $this->status);
+		if (isset (self::$messages[$this->code]))
+			header ('HTTP/1.1 ' . $this->code . ' ' . self::$messages[$this->code], false, $this->code);
 		else
-			header ('HTTP/1.1 ' . $this->status, false, $this->status);
+			header ('HTTP/1.1 ' . $this->code, false, $this->code);
 
 		if ($this->answer !== null)
 			$this->answer->send ();
 	}
-
-	public function	set_answer ($answer)
-	{
-		return $this->answer = $answer;
-	}
 }
 
-class	Invoke
+class Query
 {
-	private $arguments;
-	private $callback;
-	private $parameters;
-	private $router;
+	public $parameters;
 
-	public function __construct ($router, $callback, $arguments, $parameters)
+	private $callback;
+	private $options;
+
+	public function __construct ($callback, $options, $parameters)
 	{
-		$this->arguments = $arguments;
 		$this->callback = $callback;
+		$this->options = $options;
 		$this->parameters = $parameters;
-		$this->router = $router;
 	}
 
-	public function call ($parameters = array (), $internals = array ())
+	public function call ()
 	{
-		$parameters = array_merge ($parameters, $this->parameters);
-		$through = array_merge (array ($this->router, $parameters), $internals);
-
-		$reply = call_user_func_array ($this->callback, array_merge (array ($through), $this->arguments));
+		$relay = array_merge (array ($this), func_get_args ());
+		$reply = call_user_func_array ($this->callback, array_merge (array ($relay), $this->options));
 
 		if ($reply !== null)
 			return $reply;
 
-		throw new Error (500, new Reply ('Handler for path "' . $path . '" did not return a valid reply'));
+		throw new Error (500, new Reply ('Handler did not return a valid reply'));
 	}
 
-	public function get ($key, $value = null)
+	public function get_or_default ($key, $value = null)
 	{
 		return isset ($this->parameters[$key]) ? $this->parameters[$key] : $value;
 	}
+
+	public function get_or_fail ($key, $code = 400)
+	{
+		if (!isset ($this->parameters[$key]))
+			throw new Error ($code, new Reply ('Missing value for parameter "' . $key . '"'));
+
+		return $this->parameters[$key];
+	}
 }
 
-class	Redirect extends Answer
+class Redirect extends Answer
 {
 	const PERMANENT	= 301;
 	const FOUND		= 302;
 	const PROXY		= 305;
 	const TEMPORARY	= 307;
 
-	private $status;
+	private $code;
 	private	$url;
 
-	public function	__construct ($url, $status = 302)
+	public function	__construct ($url, $code = Redirect::FOUND)
 	{
-		$this->status = $status;
+		parent::__construct (null, array ('Location' => $this->url));
+
+		$this->code = $code;
 		$this->url = $url;
-	}
-
-	public function	get_contents ()
-	{
-		return null;
-	}
-
-	public function	get_headers ()
-	{
-		return array ('Location' => $this->url);
 	}
 
 	public function	send ()
 	{
-		header ('Location: ' . $this->url, false, $this->status);
+		header ('Location: ' . $this->url, false, $this->code);
 	}
 }
 
-class	Reply extends Answer
+class Reply extends Answer
 {
-	private	$contents;
-	private $headers;
-
-	public function	__construct ($contents = null, $headers = array ())
-	{
-		$this->contents = $contents;
-		$this->headers = $headers;
-	}
-
-	public function	get_contents ()
-	{
-		return $this->contents;
-	}
-
-	public function	get_headers ()
-	{
-		return $this->headers;
-	}
-
 	public function	send ()
 	{
 		foreach ($this->headers as $name => $value)
@@ -168,7 +136,7 @@ class	Reply extends Answer
 	}
 }
 
-class	Router
+class Router
 {
 	const	CONSTANT = 0;
 	const	DELIMITER = '/';
@@ -184,9 +152,9 @@ class	Router
 	const	RESOLVE_NODE = 1;
 
 	private $callbacks;
-	private $parameters;
 	private $resolvers;
 	private $reversers;
+	private $sticky;
 
 	public function __construct ($source, $cache = null)
 	{
@@ -249,24 +217,26 @@ class	Router
 		);
 
 		// Initialize members
-		$this->parameters = array ();
 		$this->resolvers = $resolvers;
 		$this->reversers = $reversers;		
+		$this->sticky = array ();
 	}
 
-	public function call ($path, $parameters = array (), $internals = array ())
+	public function call ($route, $parameters = array (), $internals = array ())
 	{
-		return $this->find ($path)->call ($parameters, $internals);
+		$query = $this->find ($route, $parameters);
+
+		return call_user_func_array (array ($query, 'call'), $internals);
 	}
 
-	public function find ($path)
+	public function find ($route, $parameters = array ())
 	{
-		return $this->resolve ($this->resolvers, $path, array ());
+		return $this->resolve ($this->resolvers, $route, $parameters);
 	}
 
-	public function stick ($parameters)
+	public function stick ($sticky)
 	{
-		$this->parameters = $parameters;
+		$this->sticky = $sticky;
 	}
 
 	public function url ($name, $parameters = array (), $anchor = null)
@@ -274,12 +244,11 @@ class	Router
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t create URL to unknown route "' . $name . '"');
 
-		$remains = array_merge ($this->parameters, $parameters);
-		$url = self::reverse ($this->reversers[$name], $remains);
-
 		$first = true;
+		$inject = array_merge ($this->sticky, $parameters);
+		$url = self::reverse ($this->reversers[$name], $inject);
 
-		foreach ($remains as $key => $value)
+		foreach ($inject as $key => $value)
 		{
 			if ($first)
 			{
@@ -476,11 +445,11 @@ class	Router
 		return $fragments;
 	}
 
-	private function resolve ($resolvers, $path, $parameters)
+	private function resolve ($resolvers, $route, $parameters)
 	{
 		foreach ($resolvers as $resolver)
 		{
-			if (preg_match ($resolver[0], $path, $match, PREG_OFFSET_CAPTURE) === 1)
+			if (preg_match ($resolver[0], $route, $match, PREG_OFFSET_CAPTURE) === 1)
 			{
 				foreach ($resolver[1] as $index => $key)
 					$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : null;
@@ -488,22 +457,22 @@ class	Router
 				switch ($resolver[2])
 				{
 					case self::RESOLVE_LEAF:
-						$name = $resolver[3];
+						$type = $resolver[3];
 
-						if (!isset ($this->callbacks[$name]))
-							throw new Error (500, new Reply ('Unknown handler type "' . $name . '"'));
+						if (!isset ($this->callbacks[$type]))
+							throw new Error (500, new Reply ('Unknown handler type "' . $type . '"'));
 
-						return new Invoke ($this, $this->callbacks[$name], $resolver[4], $parameters);
+						return new Query ($this->callbacks[$type], $resolver[4], $parameters);
 
 					case self::RESOLVE_NODE:
-						return $this->resolve ($resolver[3], substr ($path, strlen ($match[0][0])), $parameters);
+						return $this->resolve ($resolver[3], substr ($route, strlen ($match[0][0])), $parameters);
 				}
 
 				throw new Error (500, new Reply ('Unknown configuration error'));
 			}
 		}
 
-		throw new Error (404, new Reply ('No page found for path "' . $path . '"'));
+		throw new Error (404, new Reply ('No page found for route "' . $route . '"'));
 	}
 
 	private static function reverse ($fragments, &$parameters)
