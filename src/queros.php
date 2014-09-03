@@ -250,6 +250,9 @@ class Router
 
 		foreach ($inject as $key => $value)
 		{
+			if ($value === null)
+				continue;
+
 			if ($first)
 			{
 				$first = false;
