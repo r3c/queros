@@ -16,7 +16,7 @@ function handle_index ($query, $router)
 function handle_topic ($query, $router)
 {
 	return new Queros\Reply ('<h1>Topic page</h1>
-<p>Reading topic #' . htmlspecialchars ($query->get_or_fail ('topic')) . ' on page n°' . htmlspecialchars ($query->get_or_fail ('page')) . '.</p>
+<p>Reading topic #' . htmlspecialchars ($query->get_or_fail ('topic')) . ' on page #' . htmlspecialchars ($query->get_or_fail ('page')) . '.</p>
 <a href="' . htmlspecialchars ($router->url ('index')) . '">Back</a>');
 }
 
@@ -53,7 +53,8 @@ $router = new Queros\Router (array
 
 try
 {
-	$router->call ($_GET['route'], $_REQUEST, array ($router))->send ();
+	$reply = $router->call ($_GET['route'], $_REQUEST, array ($router));
+	$reply->send ();
 }
 catch (Queros\Exception $exception)
 {
