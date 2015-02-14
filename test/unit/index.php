@@ -31,16 +31,13 @@ function handle_test ($query)
 
 $test = new Queros\Router (array
 (
-	'routes' => array
+	'index'	=> array ('(index)',	'func:handle_index'),
+	'forum'	=> array ('forum/',		array
 	(
-		'index'	=> array ('(index)',	'func:handle_index'),
-		'forum'	=> array ('forum/',		array
-		(
-			'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
-			'.post.edit'	=> array ('edit-post',													'func:handle_post')
-		)),
-		'test'	=> array ('(<something>)followed by(<optional>)',	'func:handle_test')
-	)
+		'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'func:handle_topic'),
+		'.post.edit'	=> array ('edit-post',													'func:handle_post')
+	)),
+	'test'	=> array ('(<something>)followed by(<optional>)',	'func:handle_test')
 ));
 
 header ('Content-Type: text/plain');

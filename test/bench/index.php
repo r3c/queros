@@ -4,15 +4,12 @@ require ('../../src/queros.php');
 
 $router = new Queros\Router (array
 (
-	'routes'	=> array
+	'index'	=> array ('(index)',	'void'),
+	'forum'	=> array ('forum/',		array
 	(
-		'index'	=> array ('(index)',	'void'),
-		'forum'	=> array ('forum/',		array
-		(
-			'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'void'),
-			'.post.edit'	=> array ('edit-post-<post:\\d+>',										'void')
-		))
-	)
+		'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))',	'void'),
+		'.post.edit'	=> array ('edit-post-<post:\\d+>',										'void')
+	))
 ));
 
 $count = 10000;

@@ -138,18 +138,19 @@ class Reply extends Answer
 
 class Router
 {
-	const	CONSTANT = 0;
-	const	DELIMITER = '/';
-	const	ESCAPE = '%';
-	const	OPTION = 1;
-	const	OPTION_BEGIN = '(';
-	const	OPTION_END = ')';
-	const	PARAM = 2;
-	const	PARAM_ARGUMENT = ':';
-	const	PARAM_BEGIN = '<';
-	const	PARAM_END = '>';
-	const	RESOLVE_LEAF = 0;
-	const	RESOLVE_NODE = 1;
+	const CONSTANT = 0;
+	const DELIMITER = '/';
+	const ESCAPE = '%';
+	const OPTION = 1;
+	const OPTION_BEGIN = '(';
+	const OPTION_END = ')';
+	const PARAM = 2;
+	const PARAM_ARGUMENT = ':';
+	const PARAM_BEGIN = '<';
+	const PARAM_END = '>';
+	const RESOLVE_LEAF = 0;
+	const RESOLVE_NODE = 1;
+	const SUFFIX = '!suffix';
 
 	private $callbacks;
 	private $resolvers;
@@ -165,17 +166,15 @@ class Router
 			if (is_string ($source))
 				require ($source);
 			else
-				$queros = $source;
+				$routes = $source;
 
-			if (!is_array ($queros))
-				throw new \Exception ('unable to load Queros configuration from source');
+			if (!is_array ($routes))
+				throw new \Exception ('unable to load routes configuration from source');
 
 			$resolvers = array ();
 			$reversers = array ();
-			$routes = isset ($queros['routes']) ? (array)$queros['routes'] : array ();
-			$suffix = isset ($queros['suffix']) ? (string)$queros['suffix'] : '';
 
-			self::convert ($resolvers, $reversers, $routes, '', $suffix, array ());
+			self::convert ($resolvers, $reversers, $routes, '', '', array ());
 
 			// Save to cache
 			if ($cache !== null)
@@ -272,6 +271,13 @@ class Router
 
 	private static function convert (&$resolvers, &$reversers, $routes, $parent, $suffix, $reverser)
 	{
+		if (isset ($routes[self::SUFFIX]))
+		{
+			$suffix = $routes[self::SUFFIX] . $suffix;
+
+			unset ($routes[self::SUFFIX]);
+		}
+
 		foreach ($routes as $child => $route)
 		{
 			$groups = array ();
