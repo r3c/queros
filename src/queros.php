@@ -189,18 +189,16 @@ class Router
 			if (!is_array ($routes))
 				throw new \Exception ('unable to load routes configuration from source');
 
-			$resolvers = array ();
-			$reversers = array ();
-
-			self::convert ($resolvers, $reversers, $routes, '', '', array ());
+			list ($resolvers, $reversers) = self::convert ($routes, '');
 
 			// Save to cache
 			if ($cache !== null)
 			{
-				$contents = '<?php ' .
-					'$resolvers = ' . self::export ($resolvers) . '; ' .
-					'$reversers = ' . self::export ($reversers) . '; ' .
-				'?>';
+				$contents =
+					'<?php ' .
+						'$resolvers = ' . self::export ($resolvers) . '; ' .
+						'$reversers = ' . self::export ($reversers) . '; ' .
+					'?>';
 
 				if (file_put_contents ($cache, $contents, LOCK_EX) === false)
 					throw new \Exception ('unable to create cache');
@@ -235,7 +233,7 @@ class Router
 
 		// Initialize members
 		$this->resolvers = $resolvers;
-		$this->reversers = $reversers;		
+		$this->reversers = $reversers;
 		$this->sticky = array ();
 	}
 
@@ -290,7 +288,7 @@ class Router
 		return $url;
 	}
 
-	private static function convert (&$resolvers, &$reversers, $routes, $parent, $suffix, $reverser)
+	private static function convert ($routes, $suffix)
 	{
 		if (isset ($routes[self::SUFFIX]))
 		{
@@ -299,35 +297,45 @@ class Router
 			unset ($routes[self::SUFFIX]);
 		}
 
-		foreach ($routes as $child => $route)
+		$resolvers = array ();
+		$reversers = array ();
+
+		foreach ($routes as $name => $route)
 		{
-			$groups = array ();
-			$name = $parent . $child;
+			$captures = array ();
 			$i = 0;
 
 			// Node has children, run recursive conversion
 			if (is_array ($route[1]))
 			{
-				$children = array ();
-				$fragments = self::parse ($route[0], $i);
-				$pattern = self::generate ($fragments, $groups);
+				$chunks = self::parse ($route[0], $i);
 
-				self::convert ($children, $reversers, $route[1], $name, $suffix, array_merge ($reverser, $fragments));
+				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $suffix);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $groups, self::RESOLVE_NODE, $children);
+				$fragment = self::make_fragment ($chunks);
+				$pattern = self::make_pattern ($chunks, $captures);
+
+				foreach ($child_reversers as $child_name => $child_fragment)
+					$reversers[$name . $child_name] = array_merge ($fragment, $child_fragment);
+
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $captures, self::RESOLVE_NODE, $child_resolvers);
 			}
 
 			// Node is a leaf, register callback
 			else
 			{
-				$callback = explode (':', $route[1]);
-				$fragments = self::parse ($route[0] . $suffix, $i);
-				$pattern = self::generate ($fragments, $groups);
+				$chunks = self::parse ($route[0] . $suffix, $i);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $groups, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
-				$reversers[$name] = array_merge ($reverser, $fragments);
+				$callback = explode (':', $route[1]);
+				$fragment = self::make_fragment ($chunks);
+				$pattern = self::make_pattern ($chunks, $captures);
+
+				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $captures, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
+				$reversers[$name] = $fragment;
 			}
 		}
+
+		return array ($resolvers, $reversers);
 	}
 
 	private static function export ($input)
@@ -353,27 +361,55 @@ class Router
 		return var_export ($input, true);
 	}
 
-	private static function generate ($fragments, &$groups)
+	private static function make_fragment ($chunks)
 	{
-		$pattern = '';
+		$fragment = array ();
 
-		foreach ($fragments as $fragment)
+		foreach ($chunks as $chunk)
 		{
-			switch ($fragment[0])
+			switch ($chunk[0])
 			{
 				case self::CONSTANT:
-					$pattern .= preg_quote ($fragment[1], self::DELIMITER);
+					$fragment[] = array (self::CONSTANT, $chunk[1]);
 
 					break;
 
 				case self::OPTION:
-					$pattern .= '(?:' . self::generate ($fragment[1], $groups) . ')?';
+					$fragment[] = array (self::OPTION, self::make_fragment ($chunk[1]));
 
 					break;
 
 				case self::PARAM:
-					$pattern .= '(' . $fragment[1] . ')';
-					$groups[] = array ($fragment[2], $fragment[3]);
+					$fragment[] = array (self::PARAM, $chunk[2], $chunk[3]);
+
+					break;
+			}
+		}
+
+		return $fragment;
+	}
+
+	private static function make_pattern ($chunks, &$captures)
+	{
+		$pattern = '';
+
+		foreach ($chunks as $chunk)
+		{
+			switch ($chunk[0])
+			{
+				case self::CONSTANT:
+					$pattern .= preg_quote ($chunk[1], self::DELIMITER);
+
+					break;
+
+				case self::OPTION:
+					$pattern .= '(?:' . self::make_pattern ($chunk[1], $captures) . ')?';
+
+					break;
+
+				case self::PARAM:
+					$captures[] = array ($chunk[2], $chunk[3]);
+					$pattern .= '(' . $chunk[1] . ')';
 
 					break;
 			}
@@ -384,7 +420,7 @@ class Router
 
 	private static function parse ($string, &$i)
 	{
-		$fragments = array ();
+		$chunks = array ();
 		$length = strlen ($string);
 
 		while ($i < $length && $string[$i] !== self::OPTION_END)
@@ -399,7 +435,7 @@ class Router
 					if ($i >= $length || $string[$i] !== self::OPTION_END)
 						throw new \Exception ('unfinished optional sub-sequence');
 
-					$fragments[] = array (self::OPTION, $sequence);
+					$chunks[] = array (self::OPTION, $sequence);
 
 					++$i;
 
@@ -449,7 +485,7 @@ class Router
 					if ($i >= $length || $string[$i] !== self::PARAM_END)
 						throw new \Exception ('unfinished parameter name');
 
-					$fragments[] = array (self::PARAM, $pattern, $key, $default);
+					$chunks[] = array (self::PARAM, $pattern, $key, $default);
 
 					++$i;
 
@@ -466,13 +502,13 @@ class Router
 						$buffer .= $string[$i];
 					}
 
-					$fragments[] = array (self::CONSTANT, $buffer);
+					$chunks[] = array (self::CONSTANT, $buffer);
 
 					break;
 			}
 		}
 
-		return $fragments;
+		return $chunks;
 	}
 
 	private function resolve ($resolvers, $route, $parameters)
@@ -509,22 +545,22 @@ class Router
 		throw new Error (404, new Reply ('No page found for route "' . $route . '"'));
 	}
 
-	private static function reverse ($fragments, $forced, &$parameters)
+	private static function reverse ($reverser, $forced, &$parameters)
 	{
 		$defined = true;
 		$result = '';
 
-		foreach ($fragments as $fragment)
+		foreach ($reverser as $element)
 		{
-			switch ($fragment[0])
+			switch ($element[0])
 			{
 				case self::CONSTANT:
-					$result .= $fragment[1];
+					$result .= $element[1];
 
 					break;
 
 				case self::OPTION:
-					$append = self::reverse ($fragment[1], false, $parameters);
+					$append = self::reverse ($element[1], false, $parameters);
 
 					if ($append !== null)
 					{
@@ -535,21 +571,21 @@ class Router
 					break;
 
 				case self::PARAM:
-					if (isset ($parameters[$fragment[2]]))
+					if (isset ($parameters[$element[1]]))
 					{
-						$parameter = (string)$parameters[$fragment[2]];
+						$parameter = (string)$parameters[$element[1]];
 
-						if ($parameter !== $fragment[3])
+						if ($parameter !== $element[2])
 							$forced = true;
 
 						$result .= rawurlencode ($parameter);
 					}
-					else if ($fragment[3] !== null)
-						$result .= rawurlencode ($fragment[3]);
+					else if ($element[2] !== null)
+						$result .= rawurlencode ($element[2]);
 					else
 						$defined = false;
 
-					unset ($parameters[$fragment[2]]);
+					unset ($parameters[$element[1]]);
 
 					break;
 			}
