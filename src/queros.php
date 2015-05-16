@@ -8,6 +8,9 @@ namespace Queros;
 
 define ('QUEROS', '1.0.3.0');
 
+/*
+** Request answer.
+*/
 abstract class Answer
 {
 	public $contents;
@@ -22,6 +25,9 @@ abstract class Answer
 	public abstract function send ();
 }
 
+/*
+** Request error.
+*/
 class Error extends \Exception
 {
 	private static	$messages = array
@@ -61,6 +67,9 @@ class Error extends \Exception
 	}
 }
 
+/*
+** Single request object.
+*/
 class Query
 {
 	public $parameters;
@@ -100,6 +109,9 @@ class Query
 	}
 }
 
+/*
+** Redirect answer.
+*/
 class Redirect extends Answer
 {
 	const PERMANENT	= 301;
@@ -124,6 +136,9 @@ class Redirect extends Answer
 	}
 }
 
+/*
+** Regular answer.
+*/
 class Reply extends Answer
 {
 	public function	send ()
@@ -136,6 +151,9 @@ class Reply extends Answer
 	}
 }
 
+/*
+** Requests router.
+*/
 class Router
 {
 	const CONSTANT = 0;
@@ -241,11 +259,14 @@ class Router
 	public function url ($name, $parameters = array (), $anchor = null)
 	{
 		if (!isset ($this->reversers[$name]))
-			throw new \Exception ('can\'t create URL to unknown route "' . $name . '"');
+			throw new \Exception ('can\'t build URL to unknown route "' . $name . '"');
 
 		$first = true;
 		$inject = array_merge ($this->sticky, $parameters);
-		$url = self::reverse ($this->reversers[$name], $inject);
+		$url = self::reverse ($this->reversers[$name], true, $inject);
+
+		if ($url === null)
+			throw new \Exception ('can\'t build URL to incomplete route "' . $name . '"');
 
 		foreach ($inject as $key => $value)
 		{
@@ -296,7 +317,7 @@ class Router
 				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $groups, self::RESOLVE_NODE, $children);
 			}
 
-			// Leaf
+			// Node is a leaf, register callback
 			else
 			{
 				$callback = explode (':', $route[1]);
@@ -351,8 +372,8 @@ class Router
 					break;
 
 				case self::PARAM:
-					$pattern .= '(' . $fragment[2] . ')';
-					$groups[] = $fragment[1];
+					$pattern .= '(' . $fragment[1] . ')';
+					$groups[] = array ($fragment[2], $fragment[3]);
 
 					break;
 			}
@@ -428,7 +449,7 @@ class Router
 					if ($i >= $length || $string[$i] !== self::PARAM_END)
 						throw new \Exception ('unfinished parameter name');
 
-					$fragments[] = array (self::PARAM, $key, $pattern, $default);
+					$fragments[] = array (self::PARAM, $pattern, $key, $default);
 
 					++$i;
 
@@ -460,8 +481,12 @@ class Router
 		{
 			if (preg_match ($resolver[0], $route, $match, PREG_OFFSET_CAPTURE) === 1)
 			{
-				foreach ($resolver[1] as $index => $key)
-					$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : null;
+				foreach ($resolver[1] as $index => $parameter)
+				{
+					list ($key, $default) = $parameter;
+
+					$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : $default;
+				}
 
 				switch ($resolver[2])
 				{
@@ -484,43 +509,56 @@ class Router
 		throw new Error (404, new Reply ('No page found for route "' . $route . '"'));
 	}
 
-	private static function reverse ($fragments, &$parameters)
+	private static function reverse ($fragments, $forced, &$parameters)
 	{
-		$set = true;
-		$url = '';
+		$defined = true;
+		$result = '';
 
 		foreach ($fragments as $fragment)
 		{
 			switch ($fragment[0])
 			{
 				case self::CONSTANT:
-					$url .= $fragment[1];
+					$result .= $fragment[1];
 
 					break;
 
 				case self::OPTION:
-					$url .= self::reverse ($fragment[1], $parameters);
+					$append = self::reverse ($fragment[1], false, $parameters);
+
+					if ($append !== null)
+					{
+						$forced = true;
+						$result .= $append;
+					}
 
 					break;
 
 				case self::PARAM:
-					if (isset ($parameters[$fragment[1]]))
-						$url .= $parameters[$fragment[1]];
-					else if ($fragment[3] !== null)
-						$url .= $fragment[3];
-					else
-						$set = false;
+					if (isset ($parameters[$fragment[2]]))
+					{
+						$parameter = (string)$parameters[$fragment[2]];
 
-					unset ($parameters[$fragment[1]]);
+						if ($parameter !== $fragment[3])
+							$forced = true;
+
+						$result .= rawurlencode ($parameter);
+					}
+					else if ($fragment[3] !== null)
+						$result .= rawurlencode ($fragment[3]);
+					else
+						$defined = false;
+
+					unset ($parameters[$fragment[2]]);
 
 					break;
 			}
 		}
 
-		if ($set)
-			return $url;
+		if ($defined && $forced)
+			return $result;
 
-		return '';
+		return null;
 	}
 }
 

@@ -1,6 +1,6 @@
 <?php
 
-require ('../../src/queros.php');
+require ('../src/queros.php');
 
 function handle_index ($query)
 {
@@ -9,7 +9,7 @@ function handle_index ($query)
 
 function handle_topic ($query)
 {
-	$page = (int)$query->get_or_default ('page', 1);
+	$page = (int)$query->get_or_fail ('page');
 	$topic = $query->get_or_fail ('topic');
 	$title = $query->get_or_default ('title', '');
 
@@ -42,19 +42,45 @@ $test = new Queros\Router (array
 
 header ('Content-Type: text/plain');
 
+assert_options (ASSERT_BAIL, true);
+
+// Route resolution, standard usage
 assert ($test->call ('')->contents === 'handle::index');
 assert ($test->call ('index')->contents === 'handle::index');
-assert ($test->call ('forum/topic-52')->contents === "handle::topic(52, 1, '')");
 assert ($test->call ('forum/topic-17/3')->contents === "handle::topic(17, 3, '')");
 assert ($test->call ('forum/topic-42/5-my-topic-title')->contents === "handle::topic(42, 5, 'my-topic-title')");
 assert ($test->call ('followed by')->contents === "handle::test('', '')");
 assert ($test->call ('XXXfollowed byYYY')->contents === "handle::test('XXX', 'YYY')");
 
-assert ($test->url ('index') === 'index');
-assert ($test->url ('forum.topic', array ('topic' => 15, 'other' => 'key', 'in' => 'query-string')) === 'forum/topic-15/1?other=key&in=query-string');
+// Route resolution, optional parameters
+assert ($test->call ('forum/topic-52')->contents === "handle::topic(52, 1, '')");
+assert ($test->call ('forum/topic-52/1')->contents === "handle::topic(52, 1, '')");
+
+// URL generation, standard usage
+assert ($test->url ('index') === '');
+assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
 assert ($test->url ('forum.topic', array ('topic' => 15, 'page' => 2, 'title' => 'test')) === 'forum/topic-15/2-test');
 assert ($test->url ('forum.post.edit') === 'forum/edit-post');
-assert ($test->url ('test', array ('something' => '[[', 'optional' => ']]')) == '[[followed by]]');
+assert ($test->url ('test', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
+
+// URL generation, optional parameters
+assert ($test->url ('forum.topic', array ('topic' => 15)) === 'forum/topic-15');
+assert ($test->url ('forum.topic', array ('topic' => 15, 'page' => 1)) === 'forum/topic-15');
+assert ($test->url ('forum.topic', array ('topic' => 15, 'title' => 'some-title')) === 'forum/topic-15/1-some-title');
+
+// URL generation, exception on missing mandatory parameter
+try
+{
+	$test->url ('forum.topic', array ('page' => 1, 'title' => 'test'));
+
+	$exception = null;
+}
+catch (Exception $e)
+{
+	$exception = $e;
+}
+
+assert (strpos ($exception->getMessage (), '"forum.topic"') !== false);
 
 echo 'Tests OK!';
 
