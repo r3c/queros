@@ -72,14 +72,16 @@ class Error extends \Exception
 */
 class Query
 {
+	public $method;
 	public $parameters;
 
 	private $callback;
 	private $options;
 
-	public function __construct ($callback, $options, $parameters)
+	public function __construct ($callback, $options, $method, $parameters)
 	{
 		$this->callback = $callback;
+		$this->method = $method;
 		$this->options = $options;
 		$this->parameters = $parameters;
 	}
@@ -215,14 +217,14 @@ class Router
 		// Assign default callbacks
 		$this->callbacks = array
 		(
+			'call'	=> function ($arguments, $function)
+			{
+				return call_user_func_array ($function, $arguments);
+			},
 			'file'	=> function ($arguments, $path, $function)
 			{
 				require ($path);
 
-				return call_user_func_array ($function, $arguments);
-			},
-			'func'	=> function ($arguments, $function)
-			{
 				return call_user_func_array ($function, $arguments);
 			},
 			'void'	=> function ()
@@ -237,16 +239,16 @@ class Router
 		$this->sticky = array ();
 	}
 
-	public function call ($route, $parameters = array (), $internals = array ())
+	public function call ($path, $method = 'GET', $parameters = array (), $internals = array ())
 	{
-		$query = $this->find ($route, $parameters);
+		$query = $this->find ($path, $method, $parameters);
 
 		return call_user_func_array (array ($query, 'call'), $internals);
 	}
 
-	public function find ($route, $parameters = array ())
+	public function find ($path, $method = 'GET', $parameters = array ())
 	{
-		return $this->resolve ($this->resolvers, $route, $parameters);
+		return $this->resolve ($this->resolvers, $path, strtoupper ($method), $parameters);
 	}
 
 	public function stick ($sticky)
@@ -302,37 +304,60 @@ class Router
 
 		foreach ($routes as $name => $route)
 		{
-			$captures = array ();
 			$i = 0;
 
 			// Node has children, run recursive conversion
-			if (is_array ($route[1]))
+			if (count ($route) === 2 && is_string ($route[0]) && is_array ($route[1]))
 			{
 				$chunks = self::parse ($route[0], $i);
 
 				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $suffix);
 
+				// Register child reversers
 				$fragment = self::make_fragment ($chunks);
-				$pattern = self::make_pattern ($chunks, $captures);
 
 				foreach ($child_reversers as $child_name => $child_fragment)
 					$reversers[$name . $child_name] = array_merge ($fragment, $child_fragment);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . self::DELIMITER, $captures, self::RESOLVE_NODE, $child_resolvers);
+				// Append child resolvers
+				list ($pattern, $captures) = self::make_pattern ($chunks);
+
+				$pattern = self::DELIMITER . '^' . $pattern . self::DELIMITER;
+
+				if (!isset ($resolvers[$pattern]))
+					$resolvers[$pattern] = array ($captures, self::RESOLVE_NODE, array ());
+
+				$resolvers[$pattern][2] = array_merge ($resolvers[$pattern][2], $child_resolvers);
 			}
 
 			// Node is a leaf, register callback
-			else
+			else if (count ($route) >= 3 && is_string ($route[0]) && is_string ($route[1]) && is_string ($route[2]))
 			{
 				$chunks = self::parse ($route[0] . $suffix, $i);
 
-				$callback = explode (':', $route[1]);
-				$fragment = self::make_fragment ($chunks);
-				$pattern = self::make_pattern ($chunks, $captures);
+				// Register final reverser
+				$reversers[$name] = self::make_fragment ($chunks);
 
-				$resolvers[] = array (self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER, $captures, self::RESOLVE_LEAF, $callback[0], array_slice ($callback, 1));
-				$reversers[$name] = $fragment;
+				// Append final resolvers
+				list ($pattern, $captures) = self::make_pattern ($chunks);
+
+				$pattern = self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER;
+
+				if (!isset ($resolvers[$pattern]))
+					$resolvers[$pattern] = array ($captures, self::RESOLVE_LEAF, array ());
+
+				foreach (array_map ('strtoupper', explode (',', $route[1])) as $method)
+				{
+					if (isset ($resolvers[$pattern][2][$method]))
+						throw new \Exception ('duplicate pattern "' . $route[0] . '" on branch "' . $name . '"');
+
+					$resolvers[$pattern][2][$method] = array ($route[2], array_slice ($route, 3));
+				}
 			}
+
+			// Invalid configuration
+			else
+				throw new \Exception ('invalid configuration on branch "' . $name . '"');
 		}
 
 		return array ($resolvers, $reversers);
@@ -389,8 +414,9 @@ class Router
 		return $fragment;
 	}
 
-	private static function make_pattern ($chunks, &$captures)
+	private static function make_pattern ($chunks)
 	{
+		$captures = array ();
 		$pattern = '';
 
 		foreach ($chunks as $chunk)
@@ -403,7 +429,10 @@ class Router
 					break;
 
 				case self::OPTION:
-					$pattern .= '(?:' . self::make_pattern ($chunk[1], $captures) . ')?';
+					list ($child_pattern, $child_captures) = self::make_pattern ($chunk[1]);
+
+					$captures = array_merge ($captures, $child_captures);
+					$pattern .= '(?:' . $child_pattern . ')?';
 
 					break;
 
@@ -415,7 +444,7 @@ class Router
 			}
 		}
 
-		return $pattern;
+		return array ($pattern, $captures);
 	}
 
 	private static function parse ($string, &$i)
@@ -511,38 +540,40 @@ class Router
 		return $chunks;
 	}
 
-	private function resolve ($resolvers, $route, $parameters)
+	private function resolve ($resolvers, $path, $method, $parameters)
 	{
-		foreach ($resolvers as $resolver)
+		foreach ($resolvers as $pattern => $resolver)
 		{
-			if (preg_match ($resolver[0], $route, $match, PREG_OFFSET_CAPTURE) === 1)
+			if (preg_match ($pattern, $path, $match, PREG_OFFSET_CAPTURE) !== 1)
+				continue;
+
+			foreach ($resolver[0] as $index => $parameter)
 			{
-				foreach ($resolver[1] as $index => $parameter)
-				{
-					list ($key, $default) = $parameter;
+				list ($key, $default) = $parameter;
 
-					$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : $default;
-				}
+				$parameters[$key] = isset ($match[$index + 1]) && $match[$index + 1][1] !== -1 ? $match[$index + 1][0] : $default;
+			}
 
-				switch ($resolver[2])
-				{
-					case self::RESOLVE_LEAF:
-						$type = $resolver[3];
+			// Node matched, continue searching recursively on children
+			if ($resolver[1] === self::RESOLVE_NODE)
+				return $this->resolve ($resolver[2], substr ($path, strlen ($match[0][0])), $method, $parameters);
 
-						if (!isset ($this->callbacks[$type]))
-							throw new Error (500, new Reply ('Unknown handler type "' . $type . '"'));
+			// Leaf matched, invoke request processing callback
+			foreach ($resolver[2] as $accept => $route)
+			{
+				if ($accept !== '' && $accept !== $method)
+					continue;
 
-						return new Query ($this->callbacks[$type], $resolver[4], $parameters);
+				$type = $route[0];
 
-					case self::RESOLVE_NODE:
-						return $this->resolve ($resolver[3], substr ($route, strlen ($match[0][0])), $parameters);
-				}
+				if (!isset ($this->callbacks[$type]))
+					throw new Error (500, new Reply ('Unknown handler type "' . $type . '"'));
 
-				throw new Error (500, new Reply ('Unknown configuration error'));
+				return new Query ($this->callbacks[$type], $route[1], $method, $parameters);
 			}
 		}
 
-		throw new Error (404, new Reply ('No page found for route "' . $route . '"'));
+		throw new Error (404, new Reply ('No route found for path "' . $path . '"'));
 	}
 
 	private static function reverse ($reverser, $forced, &$parameters)

@@ -5,6 +5,7 @@ TODO
 ----
 
 - don't force usage of "Answer" class in called methods
+- bench current implementation against single regular expression
 
 DONE
 ----
