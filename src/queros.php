@@ -9,61 +9,16 @@ namespace Queros;
 define ('QUEROS', '1.0.3.0');
 
 /*
-** Request answer.
-*/
-abstract class Answer
-{
-	public $contents;
-	public $headers;
-
-	public function __construct ($contents = null, $headers = array ())
-	{
-		$this->contents = $contents;
-		$this->headers = $headers;
-	}
-
-	public abstract function send ();
-}
-
-/*
 ** Request error.
 */
 class Error extends \Exception
 {
-	private static	$messages = array
-	(
-		400	=> 'Bad Request',
-		401	=> 'Unauthorized',
-		403	=> 'Forbidden',
-		404	=> 'Not Found',
-		405	=> 'Method Not Allowed',
-		406	=> 'Not Acceptable',
-		410	=> 'Gone',
-		500	=> 'Internal Server Error',
-		501	=> 'Not Implemented'
-	);
-
-	public $answer;
-	public $code;
-
-	public function	__construct ($code, $answer = null)
+	public function	__construct ($reply, $message = null)
 	{
-		if ($answer !== null && $answer->contents !== null)
-			parent::__construct ($answer->contents);
+		if ($message !== null)
+			parent::__construct ($message);
 
-		$this->answer = $answer;
-		$this->code = $code;
-	}
-
-	public function	send ()
-	{
-		if (isset (self::$messages[$this->code]))
-			header ('HTTP/1.1 ' . $this->code . ' ' . self::$messages[$this->code], false, $this->code);
-		else
-			header ('HTTP/1.1 ' . $this->code, false, $this->code);
-
-		if ($this->answer !== null)
-			$this->answer->send ();
+		$this->reply = $reply;
 	}
 }
 
@@ -94,7 +49,7 @@ class Query
 		if ($reply !== null)
 			return $reply;
 
-		throw new Error (500, new Reply ('Handler did not return a valid reply'));
+		return Reply::code (204);
 	}
 
 	public function get_or_default ($key, $value = null)
@@ -102,51 +57,75 @@ class Query
 		return isset ($this->parameters[$key]) ? $this->parameters[$key] : $value;
 	}
 
-	public function get_or_fail ($key, $code = 400)
+	public function get_or_fail ($key, $status = 400)
 	{
 		if (!isset ($this->parameters[$key]))
-			throw new Error ($code, new Reply ('Missing value for parameter "' . $key . '"'));
+			throw new Error (Reply::code ($status), 'Missing value for parameter "' . $key . '"');
 
 		return $this->parameters[$key];
 	}
 }
 
 /*
-** Redirect answer.
-*/
-class Redirect extends Answer
-{
-	const PERMANENT	= 301;
-	const FOUND		= 302;
-	const PROXY		= 305;
-	const TEMPORARY	= 307;
-
-	private $code;
-	private	$url;
-
-	public function	__construct ($url, $code = Redirect::FOUND)
-	{
-		parent::__construct (null, array ('Location' => $this->url));
-
-		$this->code = $code;
-		$this->url = $url;
-	}
-
-	public function	send ()
-	{
-		header ('Location: ' . $this->url, false, $this->code);
-	}
-}
-
-/*
 ** Regular answer.
 */
-class Reply extends Answer
+class Reply
 {
+	const REDIRECT_PERMANENT	= 301;
+	const REDIRECT_FOUND		= 302;
+	const REDIRECT_PROXY		= 305;
+	const REDIRECT_TEMPORARY	= 307;
+
+	private static $messages = array
+	(
+		400	=> 'Bad Request',
+		401	=> 'Unauthorized',
+		403	=> 'Forbidden',
+		404	=> 'Not Found',
+		405	=> 'Method Not Allowed',
+		406	=> 'Not Acceptable',
+		410	=> 'Gone',
+		500	=> 'Internal Server Error',
+		501	=> 'Not Implemented'
+	);
+
+	public static function code ($status, $contents = null)
+	{
+		return new Reply ($status, null, $contents);
+	}
+
+	public static function ok ($contents)
+	{
+		return new Reply (null, null, $contents);
+	}
+
+	public static function to ($url, $status = self::REDIRECT_FOUND)
+	{
+		return new Reply ($status, array ('Location' => $url), null);
+	}
+
+	public function __construct ($status, $headers, $contents)
+	{
+		$this->contents = $contents;
+		$this->headers = $headers;
+		$this->status = $status;
+	}
+
 	public function	send ()
 	{
-		foreach ($this->headers as $name => $value)
-			header ($name . ': ' . $value);
+		if ($this->status !== null)
+		{
+			if (isset (self::$messages[$this->status]))
+				header ('HTTP/1.1 ' . $this->status . ' ' . self::$messages[$this->status], true, $this->status);
+			else
+				header ('HTTP/1.1 ' . $this->status, true, $this->status);
+		}
+
+		if ($this->headers !== null)
+		{
+			foreach ($this->headers as $name => $value)
+				header ($name . ': ' . $value);
+		}
 
 		if ($this->contents !== null)
 			echo $this->contents;
@@ -229,7 +208,7 @@ class Router
 			},
 			'void'	=> function ()
 			{
-				return new Reply ();
+				return Reply::ok (null);
 			}
 		);
 
@@ -558,7 +537,7 @@ class Router
 			if ($resolver[1] === self::RESOLVE_NODE)
 				return $this->resolve ($resolver[2], substr ($path, strlen ($match[0][0])), $method, $parameters);
 
-			// Leaf matched, invoke request processing callback
+			// Leaf matched, search suitable method and start processing
 			foreach ($resolver[2] as $accept => $route)
 			{
 				if ($accept !== '' && $accept !== $method)
@@ -567,13 +546,13 @@ class Router
 				$type = $route[0];
 
 				if (!isset ($this->callbacks[$type]))
-					throw new Error (500, new Reply ('Unknown handler type "' . $type . '"'));
+					throw new Error (Reply::code (500), 'Unknown handler type "' . $type . '"');
 
 				return new Query ($this->callbacks[$type], $route[1], $method, $parameters);
 			}
 		}
 
-		throw new Error (404, new Reply ('No route found for path "' . $path . '"'));
+		throw new Error (Reply::code (404), 'No route found for path "' . $path . '"');
 	}
 
 	private static function reverse ($reverser, $forced, &$parameters)

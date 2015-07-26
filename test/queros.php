@@ -4,7 +4,7 @@ require ('../src/queros.php');
 
 function handle_index ($query)
 {
-	return new Queros\Reply ('handle::index(' . $query->method . ')');
+	return Queros\Reply::ok ('handle::index(' . $query->method . ')');
 }
 
 function handle_topic ($query)
@@ -13,12 +13,12 @@ function handle_topic ($query)
 	$topic = $query->get_or_fail ('topic');
 	$title = $query->get_or_default ('title', '');
 
-	return new Queros\Reply ('handle::topic(' . $query->method . ", $topic, $page, '$title')");
+	return Queros\Reply::ok ('handle::topic(' . $query->method . ", $topic, $page, '$title')");
 }
 
 function handle_post ($query)
 {
-	return new Queros\Reply ('handle::post(' . $query->method . ')');
+	return Queros\Reply::ok ('handle::post(' . $query->method . ')');
 }
 
 function handle_test ($query)
@@ -26,7 +26,7 @@ function handle_test ($query)
 	$optional = $query->get_or_default ('optional', '');
 	$something = $query->get_or_default ('something', '');
 
-	return new Queros\Reply ('handle::test(' . $query->method . ", '$something', '$optional')");
+	return Queros\Reply::ok ('handle::test(' . $query->method . ", '$something', '$optional')");
 }
 
 $test = new Queros\Router (array

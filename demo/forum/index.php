@@ -6,7 +6,7 @@ require ('../../src/queros.php');
 
 function handle_index ($query, $router)
 {
-	return new Queros\Reply ('<h1>Index page</h1>
+	return Queros\Reply::ok ('<h1>Index page</h1>
 <ul>
 	<li><a href="' . htmlspecialchars (make_url ($router->url ('forum.topic', array ('topic' => 42, 'page' => 3)))) . '">Go to topic #42 on page 3</a></li>
 	<li><a href="' . htmlspecialchars (make_url ($router->url ('forum.post.edit', array ('post' => 17)))) . '">Edit post #17</a></li>
@@ -15,7 +15,7 @@ function handle_index ($query, $router)
 
 function handle_topic ($query, $router)
 {
-	return new Queros\Reply ('<h1>Topic page</h1>
+	return Queros\Reply::ok ('<h1>Topic page</h1>
 <p>Reading topic #' . htmlspecialchars ($query->get_or_fail ('topic')) . ' on page #' . htmlspecialchars ($query->get_or_fail ('page')) . '.</p>
 <a href="' . htmlspecialchars (make_url ($router->url ('index'))) . '">Back</a>');
 }
@@ -40,7 +40,7 @@ function handle_post ($query, $router)
 
 	$content .= '<a href="' . htmlspecialchars (make_url ($router->url ('index'))) . '">Back</a>';
 
-	return new Queros\Reply ($content);
+	return Queros\Reply::ok ($content);
 }
 
 function make_url ($path)
