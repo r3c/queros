@@ -200,6 +200,10 @@ class Router
 			{
 				return call_user_func_array ($function, $arguments);
 			},
+			'code'	=> function ($arguments, $status, $contents = null)
+			{
+				return Reply::code ($status, $contents);
+			},
 			'file'	=> function ($arguments, $path, $function)
 			{
 				require ($path);
@@ -543,16 +547,17 @@ class Router
 				if ($accept !== '' && $accept !== $method)
 					continue;
 
+				$options = $route[1];
 				$type = $route[0];
 
 				if (!isset ($this->callbacks[$type]))
-					throw new Error (Reply::code (500), 'Unknown handler type "' . $type . '"');
+					return new Query ($this->callbacks['code'], array (500, 'Unknown handler type "' . $type . '"'), $method, $parameters);
 
-				return new Query ($this->callbacks[$type], $route[1], $method, $parameters);
+				return new Query ($this->callbacks[$type], $options, $method, $parameters);
 			}
 		}
 
-		throw new Error (Reply::code (404), 'No route found for path "' . $path . '"');
+		return new Query ($this->callbacks['code'], array (404, 'No route found for path "' . $path . '"'), $method, $parameters);
 	}
 
 	private static function reverse ($reverser, $forced, &$parameters)

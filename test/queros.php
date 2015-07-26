@@ -73,10 +73,10 @@ assert ($test->call ('forum/topic-52')->contents === "handle::topic(GET, 52, 1, 
 assert ($test->call ('forum/topic-52/1')->contents === "handle::topic(GET, 52, 1, '')");
 
 // Route resolution, exception on unknown route
-assert_exception (function () use ($test) { $test->call ('forum/topic-17/'); }, 'No route found');
-assert_exception (function () use ($test) { $test->call ('not-exists'); }, 'No route found');
-assert_exception (function () use ($test) { $test->call ('', 'POST'); }, 'No route found');
-assert_exception (function () use ($test) { $test->call ('forum/edit-post', 'PUT'); }, 'No route found');
+assert ($test->call ('forum/topic-17/')->status === 404);
+assert ($test->call ('not-exists')->status === 404);
+assert ($test->call ('', 'POST')->status === 404);
+assert ($test->call ('forum/edit-post', 'PUT')->status === 404);
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');
