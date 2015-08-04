@@ -4,40 +4,52 @@ require ('../src/queros.php');
 
 function handle_index ($query)
 {
-	return Queros\Reply::ok ('handle::index(' . $query->method . ')');
+	return Queros\Reply::ok ('handle_index(' . $query->method . ')');
 }
 
-function handle_topic ($query)
-{
-	$page = (int)$query->get_or_fail ('page');
-	$topic = $query->get_or_fail ('topic');
-	$title = $query->get_or_default ('title', '');
-
-	return Queros\Reply::ok ('handle::topic(' . $query->method . ", $topic, $page, '$title')");
-}
-
-function handle_post ($query)
-{
-	return Queros\Reply::ok ('handle::post(' . $query->method . ')');
-}
-
-function handle_test ($query)
+function handle_option ($query)
 {
 	$optional = $query->get_or_default ('optional', '');
 	$something = $query->get_or_default ('something', '');
 
-	return Queros\Reply::ok ('handle::test(' . $query->method . ", '$something', '$optional')");
+	return Queros\Reply::ok ('handle_option(' . $query->method . ", '$something', '$optional')");
+}
+
+function handle_param_first ($query)
+{
+	$mandatory = $query->get_or_fail ('mandatory');
+	$optional = (int)$query->get_or_fail ('optional');
+	$string = $query->get_or_default ('string', '');
+
+	return Queros\Reply::ok ('handle_param_first(' . $query->method . ", $mandatory, $optional, '$string')");
+}
+
+function handle_param_second ($query)
+{
+	return Queros\Reply::ok ('handle_param_second(' . $query->method . ')');
 }
 
 $test = new Queros\Router (array
 (
 	'index'	=> array ('(index)', 'GET', 'call', 'handle_index'),
-	'forum'	=> array ('forum/', array
+	'option'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
+	'param'	=> array ('param/', array
 	(
-		'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_topic'),
-		'.post.edit'	=> array ('edit-post', 'GET,POST', 'call', 'handle_post')
+		'.first'	=> array ('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
+		'.second'	=> array ('second', 'GET,POST', 'call', 'handle_param_second')
 	)),
-	'test'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_test')
+	'tree'		=> array ('tree/', array
+	(
+		'!prefix'	=> 'begin1-',
+		'!suffix'	=> '-end1',
+		'.leaf'		=> array ('leaf', '', 'code', 200),
+		'.node'		=> array ('node/', array
+		(
+			'!prefix'	=> 'begin2-',
+			'!suffix'	=> '-end2',
+			'.leaf'		=> array ('leaf', '', 'code', 200)
+		))
+	))
 ));
 
 header ('Content-Type: text/plain');
@@ -59,39 +71,47 @@ function assert_exception ($callback, $message)
 }
 
 // Route resolution, standard usage
-assert ($test->call ('')->contents === 'handle::index(GET)');
-assert ($test->call ('index')->contents === 'handle::index(GET)');
-assert ($test->call ('forum/topic-17/3')->contents === "handle::topic(GET, 17, 3, '')");
-assert ($test->call ('forum/topic-42/5-my-topic-title')->contents === "handle::topic(GET, 42, 5, 'my-topic-title')");
-assert ($test->call ('forum/edit-post', 'GET')->contents === 'handle::post(GET)');
-assert ($test->call ('forum/edit-post', 'POST')->contents === 'handle::post(POST)');
-assert ($test->call ('followed by', 'PUT')->contents === "handle::test(PUT, '', '')");
-assert ($test->call ('XXXfollowed byYYY')->contents === "handle::test(GET, 'XXX', 'YYY')");
+assert ($test->call ('')->contents === 'handle_index(GET)');
+assert ($test->call ('index')->contents === 'handle_index(GET)');
+assert ($test->call ('param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
+assert ($test->call ('param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
+assert ($test->call ('param/second', 'GET')->contents === 'handle_param_second(GET)');
+assert ($test->call ('param/second', 'POST')->contents === 'handle_param_second(POST)');
+assert ($test->call ('followed by', 'PUT')->contents === "handle_option(PUT, '', '')");
+assert ($test->call ('XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
 
 // Route resolution, optional parameters
-assert ($test->call ('forum/topic-52')->contents === "handle::topic(GET, 52, 1, '')");
-assert ($test->call ('forum/topic-52/1')->contents === "handle::topic(GET, 52, 1, '')");
+assert ($test->call ('param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->call ('param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
 
 // Route resolution, exception on unknown route
-assert ($test->call ('forum/topic-17/')->status === 404);
+assert ($test->call ('param/first-17/')->status === 404);
 assert ($test->call ('not-exists')->status === 404);
 assert ($test->call ('', 'POST')->status === 404);
-assert ($test->call ('forum/edit-post', 'PUT')->status === 404);
+assert ($test->call ('param/second', 'PUT')->status === 404);
+
+// Route resolution, prefixes and suffixes
+assert ($test->call ('tree/begin1-leaf-end1')->status === 200);
+assert ($test->call ('tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');
 assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
-assert ($test->url ('forum.topic', array ('topic' => 15, 'page' => 2, 'title' => 'test')) === 'forum/topic-15/2-test');
-assert ($test->url ('forum.post.edit') === 'forum/edit-post');
-assert ($test->url ('test', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
+assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 2, 'string' => 'test')) === 'param/first-15/2-test');
+assert ($test->url ('param.second') === 'param/second');
+assert ($test->url ('option', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
 
 // URL generation, optional parameters
-assert ($test->url ('forum.topic', array ('topic' => 15)) === 'forum/topic-15');
-assert ($test->url ('forum.topic', array ('topic' => 15, 'page' => 1)) === 'forum/topic-15');
-assert ($test->url ('forum.topic', array ('topic' => 15, 'title' => 'some-title')) === 'forum/topic-15/1-some-title');
+assert ($test->url ('param.first', array ('mandatory' => 15)) === 'param/first-15');
+assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 1)) === 'param/first-15');
+assert ($test->url ('param.first', array ('mandatory' => 15, 'string' => 'some-title')) === 'param/first-15/1-some-title');
 
 // URL generation, exception on missing mandatory parameter
-assert_exception (function () use ($test) { $test->url ('forum.topic', array ('page' => 1, 'title' => 'test')); }, '"forum.topic"');
+assert_exception (function () use ($test) { $test->url ('param.first', array ('optional' => 1, 'string' => 'test')); }, '"param.first"');
+
+// URL generation, prefixes and suffixes
+assert ($test->url ('tree.leaf') === 'tree/begin1-leaf-end1');
+assert ($test->url ('tree.node.leaf') === 'tree/begin1-node/begin2-leaf-end2-end1');
 
 echo 'Tests OK!';
 

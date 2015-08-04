@@ -108,7 +108,7 @@ class Reply
 	{
 		$this->contents = $contents;
 		$this->headers = $headers;
-		$this->status = $status;
+		$this->status = $status !== null ? (int)$status : null;
 	}
 
 	public function	send ()
@@ -147,6 +147,7 @@ class Router
 	const PARAM_ARGUMENT = ':';
 	const PARAM_BEGIN = '<';
 	const PARAM_END = '>';
+	const PREFIX = '!prefix';
 	const RESOLVE_LEAF = 0;
 	const RESOLVE_NODE = 1;
 	const SUFFIX = '!suffix';
@@ -162,7 +163,9 @@ class Router
 		if ($cache === null || (@include $cache) === false)
 		{
 			// Load routes and convert to resolvers and reversers
-			if (is_string ($source))
+			if (is_callable ($source))
+				$routes = $sources ();
+			else if (is_string ($source))
 				require ($source);
 			else
 				$routes = $source;
@@ -275,6 +278,15 @@ class Router
 
 	private static function convert ($routes, $suffix)
 	{
+		if (isset ($routes[self::PREFIX]))
+		{
+			$prefix = $routes[self::PREFIX];
+
+			unset ($routes[self::PREFIX]);
+		}
+		else
+			$prefix = '';
+
 		if (isset ($routes[self::SUFFIX]))
 		{
 			$suffix = $routes[self::SUFFIX] . $suffix;
@@ -292,7 +304,7 @@ class Router
 			// Node has children, run recursive conversion
 			if (count ($route) === 2 && is_string ($route[0]) && is_array ($route[1]))
 			{
-				$chunks = self::parse ($route[0], $i);
+				$chunks = self::parse ($prefix . $route[0], $i);
 
 				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $suffix);
 
@@ -316,7 +328,7 @@ class Router
 			// Node is a leaf, register callback
 			else if (count ($route) >= 3 && is_string ($route[0]) && is_string ($route[1]) && is_string ($route[2]))
 			{
-				$chunks = self::parse ($route[0] . $suffix, $i);
+				$chunks = self::parse ($prefix . $route[0] . $suffix, $i);
 
 				// Register final reverser
 				$reversers[$name] = self::make_fragment ($chunks);
