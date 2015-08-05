@@ -71,28 +71,28 @@ function assert_exception ($callback, $message)
 }
 
 // Route resolution, standard usage
-assert ($test->call ('')->contents === 'handle_index(GET)');
-assert ($test->call ('index')->contents === 'handle_index(GET)');
-assert ($test->call ('param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
-assert ($test->call ('param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
-assert ($test->call ('param/second', 'GET')->contents === 'handle_param_second(GET)');
-assert ($test->call ('param/second', 'POST')->contents === 'handle_param_second(POST)');
-assert ($test->call ('followed by', 'PUT')->contents === "handle_option(PUT, '', '')");
-assert ($test->call ('XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
+assert ($test->call ('GET', '')->contents === 'handle_index(GET)');
+assert ($test->call ('GET', 'index')->contents === 'handle_index(GET)');
+assert ($test->call ('GET', 'param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
+assert ($test->call ('GET', 'param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
+assert ($test->call ('GET', 'param/second')->contents === 'handle_param_second(GET)');
+assert ($test->call ('POST', 'param/second')->contents === 'handle_param_second(POST)');
+assert ($test->call ('PUT', 'followed by')->contents === "handle_option(PUT, '', '')");
+assert ($test->call ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
 
 // Route resolution, optional parameters
-assert ($test->call ('param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
-assert ($test->call ('param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->call ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->call ('GET', 'param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
 
 // Route resolution, exception on unknown route
-assert ($test->call ('param/first-17/')->status === 404);
-assert ($test->call ('not-exists')->status === 404);
-assert ($test->call ('', 'POST')->status === 404);
-assert ($test->call ('param/second', 'PUT')->status === 404);
+assert ($test->call ('GET', 'param/first-17/')->status === 404);
+assert ($test->call ('GET', 'not-exists')->status === 404);
+assert ($test->call ('POST', '')->status === 404);
+assert ($test->call ('PUT', 'param/second')->status === 404);
 
 // Route resolution, prefixes and suffixes
-assert ($test->call ('tree/begin1-leaf-end1')->status === 200);
-assert ($test->call ('tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
+assert ($test->call ('GET', 'tree/begin1-leaf-end1')->status === 200);
+assert ($test->call ('GET', 'tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');

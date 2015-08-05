@@ -60,7 +60,7 @@ $router = new Queros\Router (array
 
 try
 {
-	$reply = $router->call ($_GET['route'], $_SERVER['REQUEST_METHOD'], $_REQUEST, array ($router));
+	$reply = $router->call ($_SERVER['REQUEST_METHOD'], $_GET['route'], $_REQUEST, array ($router));
 	$reply->send ();
 }
 catch (Queros\Exception $exception)

@@ -225,16 +225,16 @@ class Router
 		$this->sticky = array ();
 	}
 
-	public function call ($path, $method = 'GET', $parameters = array (), $internals = array ())
+	public function call ($method, $path, $parameters = array (), $internals = array ())
 	{
-		$query = $this->find ($path, $method, $parameters);
+		$query = $this->find ($method, $path, $parameters);
 
 		return call_user_func_array (array ($query, 'call'), $internals);
 	}
 
-	public function find ($path, $method = 'GET', $parameters = array ())
+	public function find ($method, $path, $parameters = array ())
 	{
-		return $this->resolve ($this->resolvers, $path, strtoupper ($method), $parameters);
+		return $this->resolve ($this->resolvers, strtoupper ($method), $path, $parameters);
 	}
 
 	public function stick ($sticky)
@@ -535,7 +535,7 @@ class Router
 		return $chunks;
 	}
 
-	private function resolve ($resolvers, $path, $method, $parameters)
+	private function resolve ($resolvers, $method, $path, $parameters)
 	{
 		foreach ($resolvers as $pattern => $resolver)
 		{
@@ -551,7 +551,7 @@ class Router
 
 			// Node matched, continue searching recursively on children
 			if ($resolver[1] === self::RESOLVE_NODE)
-				return $this->resolve ($resolver[2], substr ($path, strlen ($match[0][0])), $method, $parameters);
+				return $this->resolve ($resolver[2], $method, substr ($path, strlen ($match[0][0])), $parameters);
 
 			// Leaf matched, search suitable method and start processing
 			foreach ($resolver[2] as $accept => $route)

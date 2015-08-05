@@ -17,10 +17,10 @@ $start = microtime (true);
 
 for ($i = 0; $i < $count; ++$i)
 {
-	$router->find ('');
-	$router->find ('forum/topic-52');
-	$router->find ('forum/topic-17/3');
-	$router->find ('forum/topic-42/5-titre-du-topic');
+	$router->find ('GET', '');
+	$router->find ('GET', 'forum/topic-52');
+	$router->find ('GET', 'forum/topic-17/3');
+	$router->find ('GET', 'forum/topic-42/5-titre-du-topic');
 }
 
 $delta = microtime (true) - $start;
