@@ -70,6 +70,12 @@ function assert_exception ($callback, $message)
 	}
 }
 
+// Query validation, valid route
+assert ($test->find ('GET', '')->valid === true);
+
+// Query validation, invalid route
+assert ($test->find ('GET', 'not-exists')->valid === false);
+
 // Route resolution, standard usage
 assert ($test->call ('GET', '')->contents === 'handle_index(GET)');
 assert ($test->call ('GET', 'index')->contents === 'handle_index(GET)');
