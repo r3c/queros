@@ -29,17 +29,19 @@ class Query
 {
 	public $method;
 	public $parameters;
+	public $router;
 	public $valid;
 
 	private $callback;
 	private $options;
 
-	public function __construct ($callback, $options, $method, $parameters)
+	public function __construct ($router, $callback, $options, $method, $parameters)
 	{
 		$this->callback = $callback;
 		$this->method = $method;
 		$this->options = $options;
 		$this->parameters = $parameters;
+		$this->router = $router;
 		$this->valid = $callback !== null;
 	}
 
@@ -568,13 +570,13 @@ class Router
 				$type = $route[0];
 
 				if (!isset ($this->callbacks[$type]))
-					return new Query (null, array (500, 'Unknown handler type "' . $type . '"'), $method, $parameters);
+					return new Query ($this, null, array (500, 'Unknown handler type "' . $type . '"'), $method, $parameters);
 
-				return new Query ($this->callbacks[$type], $options, $method, $parameters);
+				return new Query ($this, $this->callbacks[$type], $options, $method, $parameters);
 			}
 		}
 
-		return new Query (null, array (404, 'No route found for path "' . $path . '"'), $method, $parameters);
+		return new Query ($this, null, array (404, 'No route found for path "' . $path . '"'), $method, $parameters);
 	}
 
 	private static function reverse ($reverser, $forced, &$parameters)
