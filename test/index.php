@@ -31,9 +31,9 @@ function handle_param_second ($query)
 
 $test = new Queros\Router (array
 (
-	'index'	=> array ('(index)', 'GET', 'call', 'handle_index'),
+	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'option'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
-	'param'	=> array ('param/', array
+	'param'		=> array ('param/', array
 	(
 		'.first'	=> array ('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
 		'.second'	=> array ('second', 'GET,POST', 'call', 'handle_param_second')

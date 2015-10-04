@@ -283,6 +283,10 @@ class Router
 		return $url;
 	}
 
+	/*
+	** Convert input routes into resolvers (used for path and method to route
+	** resolution) and reversers (used for route to URL construction).
+	*/
 	private static function convert ($routes, $suffix)
 	{
 		if (isset ($routes[self::PREFIX]))
@@ -311,18 +315,18 @@ class Router
 			// Node has children, run recursive conversion
 			if (count ($route) === 2 && is_string ($route[0]) && is_array ($route[1]))
 			{
-				$chunks = self::parse ($prefix . $route[0], $i);
+				$fragments = self::parse ($prefix . $route[0], $i);
 
 				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $suffix);
 
 				// Register child reversers
-				$fragment = self::make_fragment ($chunks);
+				$components = self::make_components ($fragments);
 
-				foreach ($child_reversers as $child_name => $child_fragment)
-					$reversers[$name . $child_name] = array_merge ($fragment, $child_fragment);
+				foreach ($child_reversers as $child_name => $child_components)
+					$reversers[$name . $child_name] = array_merge ($components, $child_components);
 
 				// Append child resolvers
-				list ($pattern, $captures) = self::make_pattern ($chunks);
+				list ($pattern, $captures) = self::make_pattern ($fragments);
 
 				$pattern = self::DELIMITER . '^' . $pattern . self::DELIMITER;
 
@@ -335,13 +339,13 @@ class Router
 			// Node is a leaf, register callback
 			else if (count ($route) >= 3 && is_string ($route[0]) && is_string ($route[1]) && is_string ($route[2]))
 			{
-				$chunks = self::parse ($prefix . $route[0] . $suffix, $i);
+				$fragments = self::parse ($prefix . $route[0] . $suffix, $i);
 
 				// Register final reverser
-				$reversers[$name] = self::make_fragment ($chunks);
+				$reversers[$name] = self::make_components ($fragments);
 
 				// Append final resolvers
-				list ($pattern, $captures) = self::make_pattern ($chunks);
+				list ($pattern, $captures) = self::make_pattern ($fragments);
 
 				$pattern = self::DELIMITER . '^' . $pattern . '$' . self::DELIMITER;
 
@@ -351,7 +355,7 @@ class Router
 				foreach (array_map ('strtoupper', explode (',', $route[1])) as $method)
 				{
 					if (isset ($resolvers[$pattern][2][$method]))
-						throw new \Exception ('duplicate pattern "' . $route[0] . '" on branch "' . $name . '"');
+						throw new \Exception ('duplicate method "' . $method . '" for pattern "' . $route[0] . '" on branch "' . $name . '"');
 
 					$resolvers[$pattern][2][$method] = array ($route[2], array_slice ($route, 3));
 				}
@@ -365,6 +369,9 @@ class Router
 		return array ($resolvers, $reversers);
 	}
 
+	/*
+	** Wrap native var_export function with better support for indexed arrays.
+	*/
 	private static function export ($input)
 	{
 		if (is_array ($input))
@@ -388,50 +395,56 @@ class Router
 		return var_export ($input, true);
 	}
 
-	private static function make_fragment ($chunks)
+	/*
+	** Make URL construction components from parsed URL template fragments.
+	*/
+	private static function make_components ($fragments)
 	{
-		$fragment = array ();
+		$components = array ();
 
-		foreach ($chunks as $chunk)
+		foreach ($fragments as $fragment)
 		{
-			switch ($chunk[0])
+			switch ($fragment[0])
 			{
 				case self::CONSTANT:
-					$fragment[] = array (self::CONSTANT, $chunk[1]);
+					$components[] = array (self::CONSTANT, $fragment[1]);
 
 					break;
 
 				case self::OPTION:
-					$fragment[] = array (self::OPTION, self::make_fragment ($chunk[1]));
+					$components[] = array (self::OPTION, self::make_components ($fragment[1]));
 
 					break;
 
 				case self::PARAM:
-					$fragment[] = array (self::PARAM, $chunk[2], $chunk[3]);
+					$components[] = array (self::PARAM, $fragment[2], $fragment[3]);
 
 					break;
 			}
 		}
 
-		return $fragment;
+		return $components;
 	}
 
-	private static function make_pattern ($chunks)
+	/*
+	** Make URL regular expression pattern from parsed URL template fragments.
+	*/
+	private static function make_pattern ($fragments)
 	{
 		$captures = array ();
 		$pattern = '';
 
-		foreach ($chunks as $chunk)
+		foreach ($fragments as $fragment)
 		{
-			switch ($chunk[0])
+			switch ($fragment[0])
 			{
 				case self::CONSTANT:
-					$pattern .= preg_quote ($chunk[1], self::DELIMITER);
+					$pattern .= preg_quote ($fragment[1], self::DELIMITER);
 
 					break;
 
 				case self::OPTION:
-					list ($child_pattern, $child_captures) = self::make_pattern ($chunk[1]);
+					list ($child_pattern, $child_captures) = self::make_pattern ($fragment[1]);
 
 					$captures = array_merge ($captures, $child_captures);
 					$pattern .= '(?:' . $child_pattern . ')?';
@@ -439,8 +452,8 @@ class Router
 					break;
 
 				case self::PARAM:
-					$captures[] = array ($chunk[2], $chunk[3]);
-					$pattern .= '(' . $chunk[1] . ')';
+					$captures[] = array ($fragment[2], $fragment[3]);
+					$pattern .= '(' . $fragment[1] . ')';
 
 					break;
 			}
@@ -449,9 +462,12 @@ class Router
 		return array ($pattern, $captures);
 	}
 
+	/*
+	** Parse URL template into fragments.
+	*/
 	private static function parse ($string, &$i)
 	{
-		$chunks = array ();
+		$fragments = array ();
 		$length = strlen ($string);
 
 		while ($i < $length && $string[$i] !== self::OPTION_END)
@@ -466,7 +482,7 @@ class Router
 					if ($i >= $length || $string[$i] !== self::OPTION_END)
 						throw new \Exception ('unfinished optional sub-sequence');
 
-					$chunks[] = array (self::OPTION, $sequence);
+					$fragments[] = array (self::OPTION, $sequence);
 
 					++$i;
 
@@ -516,7 +532,7 @@ class Router
 					if ($i >= $length || $string[$i] !== self::PARAM_END)
 						throw new \Exception ('unfinished parameter name');
 
-					$chunks[] = array (self::PARAM, $pattern, $key, $default);
+					$fragments[] = array (self::PARAM, $pattern, $key, $default);
 
 					++$i;
 
@@ -533,15 +549,18 @@ class Router
 						$buffer .= $string[$i];
 					}
 
-					$chunks[] = array (self::CONSTANT, $buffer);
+					$fragments[] = array (self::CONSTANT, $buffer);
 
 					break;
 			}
 		}
 
-		return $chunks;
+		return $fragments;
 	}
 
+	/*
+	** Find route matching given path and method using known resolvers.
+	*/
 	private function resolve ($resolvers, $method, $path, $parameters)
 	{
 		foreach ($resolvers as $pattern => $resolver)
@@ -579,22 +598,25 @@ class Router
 		return new Query ($this, null, array (404, 'No route found for path "' . $path . '"'), $method, $parameters);
 	}
 
-	private static function reverse ($reverser, $forced, &$parameters)
+	/*
+	** Build URL from given URL construction components.
+	*/
+	private static function reverse ($components, $forced, &$parameters)
 	{
 		$defined = true;
 		$result = '';
 
-		foreach ($reverser as $element)
+		foreach ($components as $component)
 		{
-			switch ($element[0])
+			switch ($component[0])
 			{
 				case self::CONSTANT:
-					$result .= $element[1];
+					$result .= $component[1];
 
 					break;
 
 				case self::OPTION:
-					$append = self::reverse ($element[1], false, $parameters);
+					$append = self::reverse ($component[1], false, $parameters);
 
 					if ($append !== null)
 					{
@@ -605,21 +627,21 @@ class Router
 					break;
 
 				case self::PARAM:
-					if (isset ($parameters[$element[1]]))
+					if (isset ($parameters[$component[1]]))
 					{
-						$parameter = (string)$parameters[$element[1]];
+						$parameter = (string)$parameters[$component[1]];
 
-						if ($parameter !== $element[2])
+						if ($parameter !== $component[2])
 							$forced = true;
 
 						$result .= rawurlencode ($parameter);
 					}
-					else if ($element[2] !== null)
-						$result .= rawurlencode ($element[2]);
+					else if ($component[2] !== null)
+						$result .= rawurlencode ($component[2]);
 					else
 						$defined = false;
 
-					unset ($parameters[$element[1]]);
+					unset ($parameters[$component[1]]);
 
 					break;
 			}
