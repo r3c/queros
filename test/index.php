@@ -33,6 +33,15 @@ $test = new Queros\Router (array
 (
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'option'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
+	'overlap1'	=> array ('overlap', 'GET', 'code', 200, 'overlap1'),
+	'overlap2'	=> array ('overlap', array
+	(
+		'.leaf'	=> array ('/2', 'GET', 'code', 200, 'overlap2')
+	)),
+	'overlap3'	=> array ('overlap', array
+	(
+		'.leaf'	=> array ('/3', 'GET', 'code', 200, 'overlap3')
+	)),
 	'param'		=> array ('param/', array
 	(
 		'.first'	=> array ('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
@@ -89,6 +98,11 @@ assert ($test->call ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GE
 // Route resolution, optional parameters
 assert ($test->call ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
 assert ($test->call ('GET', 'param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
+
+// Route resolution, overlapping routes
+assert ($test->call ('GET', 'overlap')->contents === 'overlap1');
+assert ($test->call ('GET', 'overlap/2')->contents === 'overlap2');
+assert ($test->call ('GET', 'overlap/3')->contents === 'overlap3');
 
 // Route resolution, exception on unknown route
 assert ($test->call ('GET', 'param/first-17/')->status === 404);
