@@ -30,7 +30,6 @@ class Query
 	public $method;
 	public $parameters;
 	public $router;
-	public $valid;
 
 	private $callback;
 	private $options;
@@ -42,7 +41,6 @@ class Query
 		$this->options = $options;
 		$this->parameters = $parameters;
 		$this->router = $router;
-		$this->valid = $callback !== null;
 	}
 
 	public function call ()
@@ -235,6 +233,9 @@ class Router
 	public function call ($method, $path, $parameters = array (), $internals = array ())
 	{
 		$query = $this->find ($method, $path, $parameters);
+
+		if ($query === null)
+			return Reply::code (404);
 
 		return call_user_func_array (array ($query, 'call'), $internals);
 	}
@@ -595,7 +596,7 @@ class Router
 			}
 		}
 
-		return new Query ($this, null, array (404, 'No route found for path "' . $path . '"'), $method, $parameters);
+		return null;
 	}
 
 	/*

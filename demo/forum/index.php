@@ -22,13 +22,14 @@ function handle_topic ($query, $router)
 
 function handle_post ($query, $router)
 {
-	$post = $query->get_or_fail ('post');
-	$text = $query->get_or_default ('text');
-
 	$content = '<h1>Post page</h1>';
+	$post = $query->get_or_fail ('post');
 
-	if ($text !== null)
+	if ($query->method === 'POST')
+	{
+		$text = $query->get_or_fail ('text');
 		$content .= '<p>Post #' . htmlspecialchars ($post) . ' has been updated with text "' . htmlspecialchars ($text) . '".</p>';
+	}
 	else
 	{
 		$content .= '<p>Editing post #' . htmlspecialchars ($post) . ':</p>
@@ -60,12 +61,13 @@ $router = new Queros\Router (array
 
 try
 {
-	$reply = $router->call ($_SERVER['REQUEST_METHOD'], $_GET['route'], $_REQUEST, array ($router));
-	$reply->send ();
+	$router
+		->call ($_SERVER['REQUEST_METHOD'], $_GET['route'], $_REQUEST, array ($router))
+		->send ();
 }
-catch (Queros\Exception $exception)
+catch (Queros\Error $error)
 {
-	$exception->send ();
+	$error->send ();
 }
 
 ?>

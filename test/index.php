@@ -32,7 +32,12 @@ function handle_param_second ($query)
 $test = new Queros\Router (array
 (
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
-	'option'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
+	'option1'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
+	'option2'	=> array ('option', array
+	(
+		'.leaf1'	=> array ('(/<a:\\d+>)/<b:\\d+>', 'GET', 'code', 200, 'option2'),
+		'.leaf2'	=> array ('(/<a:\\d+>)/x', 'GET', 'code', 200, 'option2'),
+	)),
 	'overlap1'	=> array ('overlap', 'GET', 'code', 200, 'overlap1'),
 	'overlap2'	=> array ('overlap', array
 	(
@@ -80,10 +85,10 @@ function assert_exception ($callback, $message)
 }
 
 // Query validation, valid route
-assert ($test->find ('GET', '')->valid === true);
+assert ($test->find ('GET', '') !== null);
 
 // Query validation, invalid route
-assert ($test->find ('GET', 'not-exists')->valid === false);
+assert ($test->find ('GET', 'not-exists') === null);
 
 // Route resolution, standard usage
 assert ($test->call ('GET', '')->contents === 'handle_index(GET)');
@@ -94,6 +99,8 @@ assert ($test->call ('GET', 'param/second')->contents === 'handle_param_second(G
 assert ($test->call ('POST', 'param/second')->contents === 'handle_param_second(POST)');
 assert ($test->call ('PUT', 'followed by')->contents === "handle_option(PUT, '', '')");
 assert ($test->call ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
+assert ($test->call ('GET', 'option/42/17')->contents === 'option2');
+assert ($test->call ('GET', 'option/17')->contents === 'option2');
 
 // Route resolution, optional parameters
 assert ($test->call ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
@@ -119,7 +126,7 @@ assert ($test->url ('index') === '');
 assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
 assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 2, 'string' => 'test')) === 'param/first-15/2-test');
 assert ($test->url ('param.second') === 'param/second');
-assert ($test->url ('option', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
+assert ($test->url ('option1', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
 
 // URL generation, optional parameters
 assert ($test->url ('param.first', array ('mandatory' => 15)) === 'param/first-15');
