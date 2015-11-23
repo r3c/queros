@@ -43,7 +43,7 @@ class Query
 		$this->router = $router;
 	}
 
-	public function call ()
+	public function invoke ()
 	{
 		if ($this->callback === null)
 			return Reply::code ($this->options[0], $this->options[1]);
@@ -54,7 +54,7 @@ class Query
 		if ($reply !== null)
 			return $reply;
 
-		return Reply::code (204);
+		return Reply::code (200);
 	}
 
 	public function get_or_default ($key, $value = null)
@@ -230,19 +230,24 @@ class Router
 		$this->sticky = array ();
 	}
 
-	public function call ($method, $path, $parameters = array (), $internals = array ())
+	public function invoke ($method, $path, $parameters = array (), $internals = array ())
 	{
-		$query = $this->find ($method, $path, $parameters);
+		$query = $this->match ($method, $path, $parameters);
 
 		if ($query === null)
 			return Reply::code (404);
 
-		return call_user_func_array (array ($query, 'call'), $internals);
+		return call_user_func_array (array ($query, 'invoke'), $internals);
 	}
 
-	public function find ($method, $path, $parameters = array ())
+	public function match ($method, $path, $parameters = array ())
 	{
 		return $this->resolve ($this->resolvers, strtoupper ($method), $path, $parameters);
+	}
+
+	public function register ($type, $callback)
+	{
+		$this->callbacks[$type] = $callback;
 	}
 
 	public function stick ($sticky)

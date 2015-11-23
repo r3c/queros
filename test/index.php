@@ -85,41 +85,41 @@ function assert_exception ($callback, $message)
 }
 
 // Query validation, valid route
-assert ($test->find ('GET', '') !== null);
+assert ($test->match ('GET', '') !== null);
 
 // Query validation, invalid route
-assert ($test->find ('GET', 'not-exists') === null);
+assert ($test->match ('GET', 'not-exists') === null);
 
 // Route resolution, standard usage
-assert ($test->call ('GET', '')->contents === 'handle_index(GET)');
-assert ($test->call ('GET', 'index')->contents === 'handle_index(GET)');
-assert ($test->call ('GET', 'param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
-assert ($test->call ('GET', 'param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
-assert ($test->call ('GET', 'param/second')->contents === 'handle_param_second(GET)');
-assert ($test->call ('POST', 'param/second')->contents === 'handle_param_second(POST)');
-assert ($test->call ('PUT', 'followed by')->contents === "handle_option(PUT, '', '')");
-assert ($test->call ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
-assert ($test->call ('GET', 'option/42/17')->contents === 'option2');
-assert ($test->call ('GET', 'option/17')->contents === 'option2');
+assert ($test->invoke ('GET', '')->contents === 'handle_index(GET)');
+assert ($test->invoke ('GET', 'index')->contents === 'handle_index(GET)');
+assert ($test->invoke ('GET', 'param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
+assert ($test->invoke ('GET', 'param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
+assert ($test->invoke ('GET', 'param/second')->contents === 'handle_param_second(GET)');
+assert ($test->invoke ('POST', 'param/second')->contents === 'handle_param_second(POST)');
+assert ($test->invoke ('PUT', 'followed by')->contents === "handle_option(PUT, '', '')");
+assert ($test->invoke ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
+assert ($test->invoke ('GET', 'option/42/17')->contents === 'option2');
+assert ($test->invoke ('GET', 'option/17')->contents === 'option2');
 
 // Route resolution, optional parameters
-assert ($test->call ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
-assert ($test->call ('GET', 'param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->invoke ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->invoke ('GET', 'param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
 
 // Route resolution, overlapping routes
-assert ($test->call ('GET', 'overlap')->contents === 'overlap1');
-assert ($test->call ('GET', 'overlap/2')->contents === 'overlap2');
-assert ($test->call ('GET', 'overlap/3')->contents === 'overlap3');
+assert ($test->invoke ('GET', 'overlap')->contents === 'overlap1');
+assert ($test->invoke ('GET', 'overlap/2')->contents === 'overlap2');
+assert ($test->invoke ('GET', 'overlap/3')->contents === 'overlap3');
 
 // Route resolution, exception on unknown route
-assert ($test->call ('GET', 'param/first-17/')->status === 404);
-assert ($test->call ('GET', 'not-exists')->status === 404);
-assert ($test->call ('POST', '')->status === 404);
-assert ($test->call ('PUT', 'param/second')->status === 404);
+assert ($test->invoke ('GET', 'param/first-17/')->status === 404);
+assert ($test->invoke ('GET', 'not-exists')->status === 404);
+assert ($test->invoke ('POST', '')->status === 404);
+assert ($test->invoke ('PUT', 'param/second')->status === 404);
 
 // Route resolution, prefixes and suffixes
-assert ($test->call ('GET', 'tree/begin1-leaf-end1')->status === 200);
-assert ($test->call ('GET', 'tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
+assert ($test->invoke ('GET', 'tree/begin1-leaf-end1')->status === 200);
+assert ($test->invoke ('GET', 'tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');

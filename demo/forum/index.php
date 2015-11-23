@@ -62,7 +62,7 @@ $router = new Queros\Router (array
 try
 {
 	$router
-		->call ($_SERVER['REQUEST_METHOD'], $_GET['route'], $_REQUEST, array ($router))
+		->invoke ($_SERVER['REQUEST_METHOD'], $_GET['route'], $_REQUEST, array ($router))
 		->send ();
 }
 catch (Queros\Error $error)
