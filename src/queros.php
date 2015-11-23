@@ -178,7 +178,7 @@ class Router
 			if (!is_array ($routes))
 				throw new \Exception ('unable to load routes configuration from source');
 
-			list ($resolvers, $reversers) = self::convert ($routes, '');
+			list ($resolvers, $reversers) = self::convert ($routes, '', '');
 
 			// Save to cache
 			if ($cache !== null)
@@ -293,7 +293,7 @@ class Router
 	** Convert input routes into resolvers (used for path and method to route
 	** resolution) and reversers (used for route to URL construction).
 	*/
-	private static function convert ($routes, $suffix)
+	private static function convert ($routes, $parent, $suffix)
 	{
 		if (isset ($routes[self::PREFIX]))
 		{
@@ -314,22 +314,41 @@ class Router
 		$resolvers = array ();
 		$reversers = array ();
 
-		foreach ($routes as $name => $route)
+		foreach ($routes as $branch => $route)
 		{
 			$i = 0;
+
+			// Build route name from current branch
+			switch (strlen ($branch) > 0 ? $branch[0] : '')
+			{
+				case '+':
+					$name = $parent . substr ($branch, 1);
+
+					break;
+
+				case '=':
+					$name = substr ($branch, 1);
+
+					break;
+
+				default:
+					$name = $parent . $branch;
+
+					break;
+			}
 
 			// Node has children, run recursive conversion
 			if (count ($route) === 2 && is_string ($route[0]) && is_array ($route[1]))
 			{
 				$fragments = self::parse ($prefix . $route[0], $i);
 
-				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $suffix);
+				list ($child_resolvers, $child_reversers) = self::convert ($route[1], $name, $suffix);
 
 				// Register child reversers
 				$components = self::make_components ($fragments);
 
 				foreach ($child_reversers as $child_name => $child_components)
-					$reversers[$name . $child_name] = array_merge ($components, $child_components);
+					$reversers[$child_name] = array_merge ($components, $child_components);
 
 				// Append child resolvers
 				list ($pattern, $captures) = self::make_pattern ($fragments);
@@ -361,7 +380,7 @@ class Router
 				foreach (array_map ('strtoupper', explode (',', $route[1])) as $method)
 				{
 					if (isset ($resolvers[$pattern][2][$method]))
-						throw new \Exception ('duplicate method "' . $method . '" for pattern "' . $route[0] . '" on branch "' . $name . '"');
+						throw new \Exception ('duplicate method "' . $method . '" for pattern "' . $route[0] . '" on branch "' . $branch . '"');
 
 					$resolvers[$pattern][2][$method] = array ($route[2], array_slice ($route, 3));
 				}
@@ -369,7 +388,7 @@ class Router
 
 			// Invalid configuration
 			else
-				throw new \Exception ('invalid configuration on branch "' . $name . '"');
+				throw new \Exception ('invalid configuration on branch "' . $branch . '"');
 		}
 
 		return array ($resolvers, $reversers);

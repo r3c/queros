@@ -32,6 +32,11 @@ function handle_param_second ($query)
 $test = new Queros\Router (array
 (
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
+	'name'		=> array ('name', array
+	(
+		'=absolute'	=> array ('/absolute', 'GET', 'void'),
+		'+relative'	=> array ('/relative', 'GET', 'void'),
+	)),
 	'option1'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
 	'option2'	=> array ('option', array
 	(
@@ -127,6 +132,10 @@ assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) =
 assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 2, 'string' => 'test')) === 'param/first-15/2-test');
 assert ($test->url ('param.second') === 'param/second');
 assert ($test->url ('option1', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
+
+// URL generation, name composition
+assert ($test->url ('absolute') === 'name/absolute');
+assert ($test->url ('namerelative') === 'name/relative');
 
 // URL generation, optional parameters
 assert ($test->url ('param.first', array ('mandatory' => 15)) === 'param/first-15');
