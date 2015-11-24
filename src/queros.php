@@ -142,6 +142,9 @@ class Reply
 */
 class Router
 {
+	const BRANCH_APPEND = '+';
+	const BRANCH_IGNORE = '!';
+	const BRANCH_RESET = '=';
 	const CONSTANT = 0;
 	const DELIMITER = '/';
 	const ESCAPE = '%';
@@ -321,12 +324,17 @@ class Router
 			// Build route name from current branch
 			switch (strlen ($branch) > 0 ? $branch[0] : '')
 			{
-				case '+':
+				case self::BRANCH_APPEND:
 					$name = $parent . substr ($branch, 1);
 
 					break;
 
-				case '=':
+				case self::BRANCH_IGNORE:
+					$name = $parent;
+
+					break;
+
+				case self::BRANCH_RESET:
 					$name = substr ($branch, 1);
 
 					break;
@@ -555,7 +563,7 @@ class Router
 						$default = null;
 
 					if ($i >= $length || $string[$i] !== self::PARAM_END)
-						throw new \Exception ('unfinished parameter name');
+						throw new \Exception ('unfinished parameter "' . $key . '"');
 
 					$fragments[] = array (self::PARAM, $pattern, $key, $default);
 

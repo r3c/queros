@@ -32,41 +32,42 @@ function handle_param_second ($query)
 $test = new Queros\Router (array
 (
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
-	'name'		=> array ('name', array
+	'name.'		=> array ('name', array
 	(
-		'=absolute'	=> array ('/absolute', 'GET', 'void'),
-		'+relative'	=> array ('/relative', 'GET', 'void'),
+		'+append'	=> array ('/append', 'GET', 'void'),
+		'!ignore'	=> array ('/ignore', 'GET',' void'),
+		'=reset'	=> array ('/reset', 'GET', 'void')
 	)),
 	'option1'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
-	'option2'	=> array ('option', array
+	'option2.'	=> array ('option', array
 	(
-		'.leaf1'	=> array ('(/<a:\\d+>)/<b:\\d+>', 'GET', 'code', 200, 'option2'),
-		'.leaf2'	=> array ('(/<a:\\d+>)/x', 'GET', 'code', 200, 'option2'),
+		'leaf1'	=> array ('(/<a:\\d+>)/<b:\\d+>', 'GET', 'code', 200, 'option2'),
+		'leaf2'	=> array ('(/<a:\\d+>)/x', 'GET', 'code', 200, 'option2'),
 	)),
 	'overlap1'	=> array ('overlap', 'GET', 'code', 200, 'overlap1'),
-	'overlap2'	=> array ('overlap', array
+	'overlap2.'	=> array ('overlap', array
 	(
-		'.leaf'	=> array ('/2', 'GET', 'code', 200, 'overlap2')
+		'leaf'	=> array ('/2', 'GET', 'code', 200, 'overlap2')
 	)),
-	'overlap3'	=> array ('overlap', array
+	'overlap3.'	=> array ('overlap', array
 	(
-		'.leaf'	=> array ('/3', 'GET', 'code', 200, 'overlap3')
+		'leaf'	=> array ('/3', 'GET', 'code', 200, 'overlap3')
 	)),
-	'param'		=> array ('param/', array
+	'param.'	=> array ('param/', array
 	(
-		'.first'	=> array ('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
-		'.second'	=> array ('second', 'GET,POST', 'call', 'handle_param_second')
+		'first'		=> array ('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
+		'second'	=> array ('second', 'GET,POST', 'call', 'handle_param_second')
 	)),
-	'tree'		=> array ('tree/', array
+	'tree.'		=> array ('tree/', array
 	(
 		'!prefix'	=> 'begin1-',
 		'!suffix'	=> '-end1',
-		'.leaf'		=> array ('leaf', '', 'code', 200),
-		'.node'		=> array ('node/', array
+		'leaf'		=> array ('leaf', '', 'code', 200),
+		'node.'		=> array ('node/', array
 		(
 			'!prefix'	=> 'begin2-',
 			'!suffix'	=> '-end2',
-			'.leaf'		=> array ('leaf', '', 'code', 200)
+			'leaf'		=> array ('leaf', '', 'code', 200)
 		))
 	))
 ));
@@ -134,8 +135,9 @@ assert ($test->url ('param.second') === 'param/second');
 assert ($test->url ('option1', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
 
 // URL generation, name composition
-assert ($test->url ('absolute') === 'name/absolute');
-assert ($test->url ('namerelative') === 'name/relative');
+assert ($test->url ('reset') === 'name/reset');
+assert ($test->url ('name.') === 'name/ignore');
+assert ($test->url ('name.append') === 'name/append');
 
 // URL generation, optional parameters
 assert ($test->url ('param.first', array ('mandatory' => 15)) === 'param/first-15');
