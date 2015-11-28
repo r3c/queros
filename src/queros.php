@@ -45,11 +45,13 @@ class Query
 
 	public function invoke ()
 	{
-		if ($this->callback === null)
-			return Reply::code ($this->options[0], $this->options[1]);
-
-		$relay = array_merge (array ($this), func_get_args ());
-		$reply = call_user_func_array ($this->callback, array_merge (array ($relay), $this->options));
+		// Invoke callback ($query, $arguments, $option1, $option2, ...)
+		$reply = call_user_func_array ($this->callback, array_merge
+		(
+			array ($this),
+			array (func_get_args ()),
+			$this->options
+		));
 
 		if ($reply !== null)
 			return $reply;
@@ -207,19 +209,19 @@ class Router
 		// Assign default callbacks
 		$this->callbacks = array
 		(
-			'call'	=> function ($arguments, $function)
+			'call'	=> function ($query, $arguments, $function)
 			{
-				return call_user_func_array ($function, $arguments);
+				return call_user_func_array ($function, array_merge (array ($query), $arguments));
 			},
-			'code'	=> function ($arguments, $status, $contents = null)
+			'code'	=> function ($query, $arguments, $status, $contents = null)
 			{
 				return Reply::code ($status, $contents);
 			},
-			'file'	=> function ($arguments, $path, $function)
+			'file'	=> function ($query, $arguments, $path, $function)
 			{
 				require ($path);
 
-				return call_user_func_array ($function, $arguments);
+				return call_user_func_array ($function, array_merge (array ($query), $arguments));
 			},
 			'void'	=> function ()
 			{
@@ -622,7 +624,7 @@ class Router
 				$type = $route[0];
 
 				if (!isset ($this->callbacks[$type]))
-					return new Query ($this, null, array (500, 'Unknown handler type "' . $type . '"'), $method, $parameters);
+					throw new \Exception ('unknown callback type "' . $type . '"');
 
 				return new Query ($this, $this->callbacks[$type], $options, $method, $parameters);
 			}

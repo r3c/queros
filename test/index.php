@@ -31,7 +31,13 @@ function handle_param_second ($query)
 
 $test = new Queros\Router (array
 (
+	'callback'	=> array ('callback', 'GET', 'unknown'),
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
+	'method.'	=> array ('method', array
+	(
+		'any'	=> array ('/any', '', 'void'),
+		'put'	=> array ('/put', 'PUT', 'void')
+	)),
 	'name.'		=> array ('name', array
 	(
 		'+append'	=> array ('/append', 'GET', 'void'),
@@ -96,6 +102,9 @@ assert ($test->match ('GET', '') !== null);
 // Query validation, invalid route
 assert ($test->match ('GET', 'not-exists') === null);
 
+// Route resolution, unknown callback
+assert_exception (function () use ($test) { $test->invoke ('GET', 'callback'); }, '"unknown"');
+
 // Route resolution, standard usage
 assert ($test->invoke ('GET', '')->contents === 'handle_index(GET)');
 assert ($test->invoke ('GET', 'index')->contents === 'handle_index(GET)');
@@ -107,6 +116,12 @@ assert ($test->invoke ('PUT', 'followed by')->contents === "handle_option(PUT, '
 assert ($test->invoke ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
 assert ($test->invoke ('GET', 'option/42/17')->contents === 'option2');
 assert ($test->invoke ('GET', 'option/17')->contents === 'option2');
+
+// Route resolution, method matching
+assert ($test->match ('GET', 'method/any') !== null);
+assert ($test->match ('PUT', 'method/any') !== null);
+assert ($test->match ('GET', 'method/put') === null);
+assert ($test->match ('PUT', 'method/put') !== null);
 
 // Route resolution, optional parameters
 assert ($test->invoke ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
