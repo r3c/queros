@@ -4,11 +4,11 @@ require ('../../src/queros.php');
 
 $router = new Queros\Router (array
 (
-	'index'	=> array ('', '', 'void'),
+	'index'	=> array ('', '', 'data'),
 	'forum'	=> array ('forum/',	array
 	(
-		'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))', '', 'void'),
-		'.post.edit'	=> array ('edit-post-<post:\\d+>', '', 'void')
+		'.topic'		=> array ('topic-<topic:\\d+>(/<page:\\d+:1>(-<title:[-0-9A-Za-z]+>))', '', 'data'),
+		'.post.edit'	=> array ('edit-post-<post:\\d+>', '', 'data')
 	))
 ));
 

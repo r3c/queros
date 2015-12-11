@@ -9,23 +9,29 @@ namespace Queros;
 define ('QUEROS', '1.0.3.0');
 
 /*
-** Request error.
+** Processing error.
 */
-class Error extends \Exception
+class Failure extends \Exception
 {
-	public function	__construct ($reply, $message = null)
+	public function	__construct ($status, $message)
 	{
-		if ($message !== null)
-			parent::__construct ($message);
+		parent::__construct ($message);
 
-		$this->reply = $reply;
+		$this->status = $status;
+	}
+
+	public function send ()
+	{
+		header ($_SERVER['SERVER_PROTOCOL'] . ' ' . $this->status, true, $this->status);
+
+		echo $this->message;
 	}
 }
 
 /*
-** Single request object.
+** Resolved request.
 */
-class Query
+class Request
 {
 	public $method;
 	public $parameters;
@@ -45,18 +51,13 @@ class Query
 
 	public function invoke ()
 	{
-		// Invoke callback ($query, $arguments, $option1, $option2, ...)
-		$reply = call_user_func_array ($this->callback, array_merge
+		// Invoke callback ($request, $arguments, $option1, $option2, ...)
+		return call_user_func_array ($this->callback, array_merge
 		(
 			array ($this),
 			array (func_get_args ()),
 			$this->options
 		));
-
-		if ($reply !== null)
-			return $reply;
-
-		return Reply::code (200);
 	}
 
 	public function get_or_default ($key, $value = null)
@@ -67,80 +68,14 @@ class Query
 	public function get_or_fail ($key, $status = 400)
 	{
 		if (!isset ($this->parameters[$key]))
-			throw new Error (Reply::code ($status), 'Missing value for parameter "' . $key . '"');
+			throw new Failure ($status, 'Missing value for parameter "' . $key . '".');
 
 		return $this->parameters[$key];
 	}
 }
 
 /*
-** Regular answer.
-*/
-class Reply
-{
-	const REDIRECT_PERMANENT	= 301;
-	const REDIRECT_FOUND		= 302;
-	const REDIRECT_PROXY		= 305;
-	const REDIRECT_TEMPORARY	= 307;
-
-	private static $messages = array
-	(
-		400	=> 'Bad Request',
-		401	=> 'Unauthorized',
-		403	=> 'Forbidden',
-		404	=> 'Not Found',
-		405	=> 'Method Not Allowed',
-		406	=> 'Not Acceptable',
-		410	=> 'Gone',
-		500	=> 'Internal Server Error',
-		501	=> 'Not Implemented'
-	);
-
-	public static function code ($status, $contents = null)
-	{
-		return new Reply ($status, null, $contents);
-	}
-
-	public static function ok ($contents)
-	{
-		return new Reply (null, null, $contents);
-	}
-
-	public static function to ($url, $status = self::REDIRECT_FOUND)
-	{
-		return new Reply ($status, array ('Location' => $url), null);
-	}
-
-	public function __construct ($status, $headers, $contents)
-	{
-		$this->contents = $contents;
-		$this->headers = $headers;
-		$this->status = $status !== null ? (int)$status : null;
-	}
-
-	public function	send ()
-	{
-		if ($this->status !== null)
-		{
-			if (isset (self::$messages[$this->status]))
-				header ('HTTP/1.1 ' . $this->status . ' ' . self::$messages[$this->status], true, $this->status);
-			else
-				header ('HTTP/1.1 ' . $this->status, true, $this->status);
-		}
-
-		if ($this->headers !== null)
-		{
-			foreach ($this->headers as $name => $value)
-				header ($name . ': ' . $value);
-		}
-
-		if ($this->contents !== null)
-			echo $this->contents;
-	}
-}
-
-/*
-** Requests router.
+** Request router.
 */
 class Router
 {
@@ -209,23 +144,19 @@ class Router
 		// Assign default callbacks
 		$this->callbacks = array
 		(
-			'call'	=> function ($query, $arguments, $function)
+			'call'	=> function ($request, $arguments, $function)
 			{
-				return call_user_func_array ($function, array_merge (array ($query), $arguments));
+				return call_user_func_array ($function, array_merge (array ($request), $arguments));
 			},
-			'code'	=> function ($query, $arguments, $status, $contents = null)
+			'data'	=> function ($request, $arguments, $data = null)
 			{
-				return Reply::code ($status, $contents);
+				return $data;
 			},
-			'file'	=> function ($query, $arguments, $path, $function)
+			'file'	=> function ($request, $arguments, $path, $function)
 			{
 				require ($path);
 
-				return call_user_func_array ($function, array_merge (array ($query), $arguments));
-			},
-			'void'	=> function ()
-			{
-				return Reply::ok (null);
+				return call_user_func_array ($function, array_merge (array ($request), $arguments));
 			}
 		);
 
@@ -237,12 +168,12 @@ class Router
 
 	public function invoke ($method, $path, $parameters = array (), $internals = array ())
 	{
-		$query = $this->match ($method, $path, $parameters);
+		$request = $this->match ($method, $path, $parameters);
 
-		if ($query === null)
-			return Reply::code (404);
+		if ($request === null)
+			throw new Failure (404, 'No route found for "' . $method . ' ' . $path . '" request.');
 
-		return call_user_func_array (array ($query, 'invoke'), $internals);
+		return call_user_func_array (array ($request, 'invoke'), $internals);
 	}
 
 	public function match ($method, $path, $parameters = array ())
@@ -626,7 +557,7 @@ class Router
 				if (!isset ($this->callbacks[$type]))
 					throw new \Exception ('unknown callback type "' . $type . '"');
 
-				return new Query ($this, $this->callbacks[$type], $options, $method, $parameters);
+				return new Request ($this, $this->callbacks[$type], $options, $method, $parameters);
 			}
 		}
 

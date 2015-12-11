@@ -4,7 +4,7 @@ require ('../src/queros.php');
 
 function handle_index ($query)
 {
-	return Queros\Reply::ok ('handle_index(' . $query->method . ')');
+	return 'handle_index(' . $query->method . ')';
 }
 
 function handle_option ($query)
@@ -12,7 +12,7 @@ function handle_option ($query)
 	$optional = $query->get_or_default ('optional', '');
 	$something = $query->get_or_default ('something', '');
 
-	return Queros\Reply::ok ('handle_option(' . $query->method . ", '$something', '$optional')");
+	return 'handle_option(' . $query->method . ", '$something', '$optional')";
 }
 
 function handle_param_first ($query)
@@ -21,12 +21,12 @@ function handle_param_first ($query)
 	$optional = (int)$query->get_or_fail ('optional');
 	$string = $query->get_or_default ('string', '');
 
-	return Queros\Reply::ok ('handle_param_first(' . $query->method . ", $mandatory, $optional, '$string')");
+	return 'handle_param_first(' . $query->method . ", $mandatory, $optional, '$string')";
 }
 
 function handle_param_second ($query)
 {
-	return Queros\Reply::ok ('handle_param_second(' . $query->method . ')');
+	return 'handle_param_second(' . $query->method . ')';
 }
 
 $test = new Queros\Router (array
@@ -35,29 +35,29 @@ $test = new Queros\Router (array
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'method.'	=> array ('method', array
 	(
-		'any'	=> array ('/any', '', 'void'),
-		'put'	=> array ('/put', 'PUT', 'void')
+		'any'	=> array ('/any', '', 'data'),
+		'put'	=> array ('/put', 'PUT', 'data')
 	)),
 	'name.'		=> array ('name', array
 	(
-		'+append'	=> array ('/append', 'GET', 'void'),
-		'!ignore'	=> array ('/ignore', 'GET',' void'),
-		'=reset'	=> array ('/reset', 'GET', 'void')
+		'+append'	=> array ('/append', 'GET', 'data'),
+		'!ignore'	=> array ('/ignore', 'GET', 'data'),
+		'=reset'	=> array ('/reset', 'GET', 'data')
 	)),
 	'option1'	=> array ('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
 	'option2.'	=> array ('option', array
 	(
-		'leaf1'	=> array ('(/<a:\\d+>)/<b:\\d+>', 'GET', 'code', 200, 'option2'),
-		'leaf2'	=> array ('(/<a:\\d+>)/x', 'GET', 'code', 200, 'option2'),
+		'leaf1'	=> array ('(/<a:\\d+>)/<b:\\d+>', 'GET', 'data', 'option2'),
+		'leaf2'	=> array ('(/<a:\\d+>)/x', 'GET', 'data', 'option2'),
 	)),
-	'overlap1'	=> array ('overlap', 'GET', 'code', 200, 'overlap1'),
+	'overlap1'	=> array ('overlap', 'GET', 'data', 'overlap1'),
 	'overlap2.'	=> array ('overlap', array
 	(
-		'leaf'	=> array ('/2', 'GET', 'code', 200, 'overlap2')
+		'leaf'	=> array ('/2', 'GET', 'data', 'overlap2')
 	)),
 	'overlap3.'	=> array ('overlap', array
 	(
-		'leaf'	=> array ('/3', 'GET', 'code', 200, 'overlap3')
+		'leaf'	=> array ('/3', 'GET', 'data', 'overlap3')
 	)),
 	'param.'	=> array ('param/', array
 	(
@@ -68,12 +68,12 @@ $test = new Queros\Router (array
 	(
 		'!prefix'	=> 'begin1-',
 		'!suffix'	=> '-end1',
-		'leaf'		=> array ('leaf', '', 'code', 200),
+		'leaf'		=> array ('leaf', '', 'data', 'leaf1'),
 		'node.'		=> array ('node/', array
 		(
 			'!prefix'	=> 'begin2-',
 			'!suffix'	=> '-end2',
-			'leaf'		=> array ('leaf', '', 'code', 200)
+			'leaf'		=> array ('leaf', '', 'data', 'leaf2')
 		))
 	))
 ));
@@ -106,16 +106,16 @@ assert ($test->match ('GET', 'not-exists') === null);
 assert_exception (function () use ($test) { $test->invoke ('GET', 'callback'); }, '"unknown"');
 
 // Route resolution, standard usage
-assert ($test->invoke ('GET', '')->contents === 'handle_index(GET)');
-assert ($test->invoke ('GET', 'index')->contents === 'handle_index(GET)');
-assert ($test->invoke ('GET', 'param/first-17/3')->contents === "handle_param_first(GET, 17, 3, '')");
-assert ($test->invoke ('GET', 'param/first-42/5-my-topic-title')->contents === "handle_param_first(GET, 42, 5, 'my-topic-title')");
-assert ($test->invoke ('GET', 'param/second')->contents === 'handle_param_second(GET)');
-assert ($test->invoke ('POST', 'param/second')->contents === 'handle_param_second(POST)');
-assert ($test->invoke ('PUT', 'followed by')->contents === "handle_option(PUT, '', '')");
-assert ($test->invoke ('GET', 'XXXfollowed byYYY')->contents === "handle_option(GET, 'XXX', 'YYY')");
-assert ($test->invoke ('GET', 'option/42/17')->contents === 'option2');
-assert ($test->invoke ('GET', 'option/17')->contents === 'option2');
+assert ($test->invoke ('GET', '') === 'handle_index(GET)');
+assert ($test->invoke ('GET', 'index') === 'handle_index(GET)');
+assert ($test->invoke ('GET', 'param/first-17/3') === "handle_param_first(GET, 17, 3, '')");
+assert ($test->invoke ('GET', 'param/first-42/5-my-topic-title') === "handle_param_first(GET, 42, 5, 'my-topic-title')");
+assert ($test->invoke ('GET', 'param/second') === 'handle_param_second(GET)');
+assert ($test->invoke ('POST', 'param/second') === 'handle_param_second(POST)');
+assert ($test->invoke ('PUT', 'followed by') === "handle_option(PUT, '', '')");
+assert ($test->invoke ('GET', 'XXXfollowed byYYY') === "handle_option(GET, 'XXX', 'YYY')");
+assert ($test->invoke ('GET', 'option/42/17') === 'option2');
+assert ($test->invoke ('GET', 'option/17') === 'option2');
 
 // Route resolution, method matching
 assert ($test->match ('GET', 'method/any') !== null);
@@ -124,23 +124,23 @@ assert ($test->match ('GET', 'method/put') === null);
 assert ($test->match ('PUT', 'method/put') !== null);
 
 // Route resolution, optional parameters
-assert ($test->invoke ('GET', 'param/first-52')->contents === "handle_param_first(GET, 52, 1, '')");
-assert ($test->invoke ('GET', 'param/first-52/1')->contents === "handle_param_first(GET, 52, 1, '')");
+assert ($test->invoke ('GET', 'param/first-52') === "handle_param_first(GET, 52, 1, '')");
+assert ($test->invoke ('GET', 'param/first-52/1') === "handle_param_first(GET, 52, 1, '')");
 
 // Route resolution, overlapping routes
-assert ($test->invoke ('GET', 'overlap')->contents === 'overlap1');
-assert ($test->invoke ('GET', 'overlap/2')->contents === 'overlap2');
-assert ($test->invoke ('GET', 'overlap/3')->contents === 'overlap3');
+assert ($test->invoke ('GET', 'overlap') === 'overlap1');
+assert ($test->invoke ('GET', 'overlap/2') === 'overlap2');
+assert ($test->invoke ('GET', 'overlap/3') === 'overlap3');
 
 // Route resolution, exception on unknown route
-assert ($test->invoke ('GET', 'param/first-17/')->status === 404);
-assert ($test->invoke ('GET', 'not-exists')->status === 404);
-assert ($test->invoke ('POST', '')->status === 404);
-assert ($test->invoke ('PUT', 'param/second')->status === 404);
+assert_exception (function () use ($test) { $test->invoke ('GET', 'param/first-17/'); }, 'No route');
+assert_exception (function () use ($test) { $test->invoke ('GET', 'not-exists'); }, 'No route');
+assert_exception (function () use ($test) { $test->invoke ('POST', ''); }, 'No route');
+assert_exception (function () use ($test) { $test->invoke ('PUT', 'param/second'); }, 'No route');
 
 // Route resolution, prefixes and suffixes
-assert ($test->invoke ('GET', 'tree/begin1-leaf-end1')->status === 200);
-assert ($test->invoke ('GET', 'tree/begin1-node/begin2-leaf-end2-end1')->status === 200);
+assert ($test->invoke ('GET', 'tree/begin1-leaf-end1') === 'leaf1');
+assert ($test->invoke ('GET', 'tree/begin1-node/begin2-leaf-end2-end1') === 'leaf2');
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');
