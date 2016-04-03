@@ -31,6 +31,7 @@ function handle_param_second ($query)
 
 $test = new Queros\Router (array
 (
+	array ('anonymous', 'GET', 'data', 'anonymous'),
 	'callback'	=> array ('callback', 'GET', 'unknown'),
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'method.'	=> array ('method', array
@@ -116,6 +117,7 @@ assert ($test->invoke ('PUT', 'followed by') === "handle_option(PUT, '', '')");
 assert ($test->invoke ('GET', 'XXXfollowed byYYY') === "handle_option(GET, 'XXX', 'YYY')");
 assert ($test->invoke ('GET', 'option/42/17') === 'option2');
 assert ($test->invoke ('GET', 'option/17') === 'option2');
+assert ($test->invoke ('GET', 'anonymous') === 'anonymous');
 
 // Route resolution, method matching
 assert ($test->match ('GET', 'method/any') !== null);
@@ -165,6 +167,10 @@ assert_exception (function () use ($test) { $test->url ('param.first', array ('o
 // URL generation, prefixes and suffixes
 assert ($test->url ('tree.leaf') === 'tree/begin1-leaf-end1');
 assert ($test->url ('tree.node.leaf') === 'tree/begin1-node/begin2-leaf-end2-end1');
+
+// URL generation, unknown routes
+assert_exception (function () use ($test) { $test->url ('undefined'); }, 'unknown route');
+assert_exception (function () use ($test) { $test->url ('0'); }, 'unknown route');
 
 echo 'Tests OK!';
 

@@ -107,7 +107,7 @@ class Router
 		// Build or load resolvers and reversers from routes or cache
 		if ($cache === null || (@include $cache) === false)
 		{
-			// Load routes and convert to resolvers and reversers
+			// Load routes from given callback or file path
 			if (is_callable ($source))
 				$routes = $sources ();
 			else if (is_string ($source))
@@ -118,7 +118,14 @@ class Router
 			if (!is_array ($routes))
 				throw new \Exception ('unable to load routes configuration from source');
 
+			// Convert routes to resolvers and reversers
 			list ($resolvers, $reversers) = self::convert ($routes, '', '');
+
+			// Remove anonymous reversers (having an integer name)
+			$reversers = array_diff_key ($reversers, array_flip (array_filter (array_keys ($reversers), function ($name)
+			{
+				return preg_match ('/^[0-9]+$/', $name) === 1;
+			})));
 
 			// Save to cache
 			if ($cache !== null)
