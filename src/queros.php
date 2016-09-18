@@ -426,7 +426,7 @@ class Router
 
 				case self::PARAM:
 					$captures[] = array ($fragment[2], $fragment[3]);
-					$pattern .= '(' . $fragment[1] . ')';
+					$pattern .= '(' . str_replace (self::DELIMITER, '\\' . self::DELIMITER, $fragment[1]) . ')';
 
 					break;
 			}

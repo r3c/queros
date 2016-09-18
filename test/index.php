@@ -33,6 +33,7 @@ $test = new Queros\Router (array
 (
 	array ('anonymous', 'GET', 'data', 'anonymous'),
 	'callback'	=> array ('callback', 'GET', 'unknown'),
+	'escape'	=> array ('<escape:/truc/>', 'GET', 'data', 'escape'),
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'method.'	=> array ('method', array
 	(
@@ -143,6 +144,9 @@ assert_exception (function () use ($test) { $test->invoke ('PUT', 'param/second'
 // Route resolution, prefixes and suffixes
 assert ($test->invoke ('GET', 'tree/begin1-leaf-end1') === 'leaf1');
 assert ($test->invoke ('GET', 'tree/begin1-node/begin2-leaf-end2-end1') === 'leaf2');
+
+// Route resolution, escaped delimiter
+assert ($test->invoke ('GET', '/truc/') === 'escape');
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');
