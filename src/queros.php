@@ -162,8 +162,11 @@ class Router
 			{
 				return $data;
 			},
-			'echo'	=> function ($request, $arguments, $data = null)
+			'echo'	=> function ($request, $arguments, $data, $mime = null)
 			{
+				if ($mime !== null)
+					header ('Content-Type: ' . $mime);
+
 				echo $data;
 			}
 		);
