@@ -32,7 +32,12 @@ function handle_param_second ($query)
 $test = new Queros\Router (array
 (
 	array ('anonymous', 'GET', 'data', 'anonymous'),
-	'callback'	=> array ('callback', 'GET', 'unknown'),
+	'callback.'	=> array ('callback', array
+	(
+		'data'		=> array ('/data', 'GET', 'data', '17'),
+		'echo'		=> array ('/echo', 'GET', 'echo', '17'),
+		'unknown'	=> array ('/unknown', 'GET', 'unknown')
+	)),
 	'escape'	=> array ('<escape:/truc/>', 'GET', 'data', 'escape'),
 	'index'		=> array ('(index)', 'GET', 'call', 'handle_index'),
 	'method.'	=> array ('method', array
@@ -104,8 +109,12 @@ assert ($test->match ('GET', '') !== null);
 // Query validation, invalid route
 assert ($test->match ('GET', 'not-exists') === null);
 
+// Route resolution, standard callbacks
+assert ($test->invoke ('GET', 'callback/data') === '17');
+ob_start (); $test->invoke ('GET', 'callback/echo'); assert (ob_get_clean () === '17');
+
 // Route resolution, unknown callback
-assert_exception (function () use ($test) { $test->invoke ('GET', 'callback'); }, '"unknown"');
+assert_exception (function () use ($test) { $test->invoke ('GET', 'callback/unknown'); }, '"unknown"');
 
 // Route resolution, standard usage
 assert ($test->invoke ('GET', '') === 'handle_index(GET)');

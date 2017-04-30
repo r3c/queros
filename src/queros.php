@@ -151,19 +151,20 @@ class Router
 		// Assign default callbacks
 		$this->callbacks = array
 		(
-			'call'	=> function ($request, $arguments, $function)
+			'call'	=> function ($request, $arguments, $function, $path = null)
 			{
+				if ($path !== null)
+					require $path;
+
 				return call_user_func_array ($function, array_merge (array ($request), $arguments));
 			},
 			'data'	=> function ($request, $arguments, $data = null)
 			{
 				return $data;
 			},
-			'file'	=> function ($request, $arguments, $path, $function)
+			'echo'	=> function ($request, $arguments, $data = null)
 			{
-				require ($path);
-
-				return call_user_func_array ($function, array_merge (array ($request), $arguments));
+				echo $data;
 			}
 		);
 
