@@ -207,27 +207,25 @@ class Router
 		if (!isset ($this->reversers[$name]))
 			throw new \Exception ('can\'t build URL to unknown route "' . $name . '"');
 
-		$first = true;
 		$inject = array_merge ($this->sticky, $parameters);
 		$url = self::reverse ($this->reversers[$name], true, $inject);
 
 		if ($url === null)
 			throw new \Exception ('can\'t build URL to incomplete route "' . $name . '"');
 
+		$separator = '?';
+
 		foreach ($inject as $key => $value)
 		{
 			if ($value === null)
 				continue;
 
-			if ($first)
-			{
-				$first = false;
-				$url .= '?';
-			}
+			if ($value !== '')
+				$url .= $separator . rawurlencode ($key) . '=' . rawurlencode ($value);
 			else
-				$url .= '&';
+				$url .= $separator . rawurlencode ($key);
 
-			$url .= rawurlencode ($key) . '=' . rawurlencode ($value);
+			$separator = '&';
 		}
 
 		if ($anchor !== null)

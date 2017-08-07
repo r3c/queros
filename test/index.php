@@ -160,6 +160,7 @@ assert ($test->invoke ('GET', '/truc/') === 'escape');
 // URL generation, standard usage
 assert ($test->url ('index') === '');
 assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
+assert ($test->url ('index', array ('empty' => '')) === '?empty');
 assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 2, 'string' => 'test')) === 'param/first-15/2-test');
 assert ($test->url ('param.second') === 'param/second');
 assert ($test->url ('option1', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
