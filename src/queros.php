@@ -13,16 +13,16 @@ define ('QUEROS', '1.0.3.0');
 */
 class Failure extends \Exception
 {
-	public function	__construct ($status, $message)
+	public function	__construct ($code, $message)
 	{
 		parent::__construct ($message);
 
-		$this->status = $status;
+		$this->code = $code;
 	}
 
 	public function send ()
 	{
-		header ($_SERVER['SERVER_PROTOCOL'] . ' ' . $this->status, true, $this->status);
+		header ($_SERVER['SERVER_PROTOCOL'] . ' ' . $this->code, true, $this->code);
 
 		echo $this->message;
 	}
@@ -65,10 +65,10 @@ class Request
 		return isset ($this->parameters[$key]) ? $this->parameters[$key] : $value;
 	}
 
-	public function get_or_fail ($key, $status = 400)
+	public function get_or_fail ($key, $code = 400)
 	{
 		if (!isset ($this->parameters[$key]))
-			throw new Failure ($status, 'Missing value for parameter "' . $key . '".');
+			throw new Failure ($code, 'Missing value for parameter "' . $key . '".');
 
 		return $this->parameters[$key];
 	}
