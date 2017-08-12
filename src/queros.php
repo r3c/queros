@@ -17,12 +17,12 @@ class Failure extends \Exception
 	{
 		parent::__construct ($message);
 
-		$this->code = $code;
+		$this->http_code = $code;
 	}
 
 	public function send ()
 	{
-		header ($_SERVER['SERVER_PROTOCOL'] . ' ' . $this->code, true, $this->code);
+		header ($_SERVER['SERVER_PROTOCOL'] . ' ' . $this->http_code, true, $this->http_code);
 
 		echo $this->message;
 	}
