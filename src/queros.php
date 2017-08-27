@@ -215,17 +215,29 @@ class Router
 
 		$separator = '?';
 
-		foreach ($inject as $key => $value)
+		for (reset ($inject); true; )
 		{
-			if ($value === null)
-				continue;
+			$pair = each ($inject);
 
-			if ($value !== '')
-				$url .= $separator . rawurlencode ($key) . '=' . rawurlencode ($value);
-			else
-				$url .= $separator . rawurlencode ($key);
+			if ($pair === false)
+				break;
 
-			$separator = '&';
+			list ($key, $value) = $pair;
+
+			if (is_array ($value))
+			{
+				foreach ($value as $inner_key => $inner_value)
+					$inject[$key . '[' . $inner_key . ']'] = $inner_value;
+			}
+			else if ($value !== null)
+			{
+				if ($value !== '')
+					$url .= $separator . rawurlencode ($key) . '=' . rawurlencode ($value);
+				else
+					$url .= $separator . rawurlencode ($key);
+
+				$separator = '&';
+			}
 		}
 
 		if ($anchor !== null)

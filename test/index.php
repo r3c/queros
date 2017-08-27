@@ -159,11 +159,14 @@ assert ($test->invoke ('GET', '/truc/') === 'escape');
 
 // URL generation, standard usage
 assert ($test->url ('index') === '');
-assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
 assert ($test->url ('index', array ('empty' => '')) === '?empty');
 assert ($test->url ('param.first', array ('mandatory' => 15, 'optional' => 2, 'string' => 'test')) === 'param/first-15/2-test');
 assert ($test->url ('param.second') === 'param/second');
 assert ($test->url ('option1', array ('something' => '.~', 'optional' => '~.')) == '.~followed by~.');
+
+// URL generation, extra parameters
+assert ($test->url ('index', array ('other' => 'key', 'in' => 'query-string')) === '?other=key&in=query-string');
+assert ($test->url ('index', array ('scalar' => '43', 'complex' => array (0 => 'first', 1 => array ('a' => 'sub-second-1', 'b' => 'sub-second-2')))) === '?scalar=43&complex%5B0%5D=first&complex%5B1%5D%5Ba%5D=sub-second-1&complex%5B1%5D%5Bb%5D=sub-second-2');
 
 // URL generation, name composition
 assert ($test->url ('reset') === 'name/reset');
