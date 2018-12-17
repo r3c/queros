@@ -1,9 +1,5 @@
 <?php
 
-/*
-** Query Routing System
-*/
-
 namespace Queros;
 
 define ('QUEROS', '1.0.3.0');
