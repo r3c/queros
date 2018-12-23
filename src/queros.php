@@ -212,31 +212,7 @@ class Router
             throw new \Exception('can\'t build URL to incomplete route "' . $name . '"');
         }
 
-        $separator = '?';
-
-        for (reset($inject); true;) {
-            $pair = each($inject);
-
-            if ($pair === false) {
-                break;
-            }
-
-            list($key, $value) = $pair;
-
-            if (is_array($value)) {
-                foreach ($value as $inner_key => $inner_value) {
-                    $inject[$key . '[' . $inner_key . ']'] = $inner_value;
-                }
-            } elseif ($value !== null) {
-                if ($value !== '') {
-                    $url .= $separator . rawurlencode($key) . '=' . rawurlencode($value);
-                } else {
-                    $url .= $separator . rawurlencode($key);
-                }
-
-                $separator = '&';
-            }
-        }
+        $url .= self::make_query($inject);
 
         if ($anchor !== null) {
             $url .= '#' . rawurlencode($anchor);
@@ -440,6 +416,60 @@ class Router
         }
 
         return array($pattern, $captures);
+    }
+
+    /*
+    ** Build query string from given (key, value) pairs. Array values are
+    ** flattened when serialized see `make_query_array` method for details.
+    */
+    private static function make_query(&$parameters)
+    {
+        $query = '';
+        $separator = '?';
+
+        foreach ($parameters as $key => $value) {
+            if (is_array($value)) {
+                $query .= self::make_query_array($key, $value, $separator);
+            } elseif ($value !== null) {
+                $query .= $separator . rawurlencode($key);
+
+                if ($value !== '') {
+                    $query .= '=' . rawurlencode($value);
+                }
+
+                $separator = '&';
+            }
+        }
+
+        return $query;
+    }
+
+    /*
+    ** Build query string from given (key, value) pairs within an array. Each
+    ** value is serialized using "parent[key]=value" syntax and support nested
+    ** arrays.
+    */
+    private static function make_query_array($parent, &$parameters, &$separator)
+    {
+        $query = '';
+
+        foreach ($parameters as $key => $value) {
+            $name = $parent . '[' . $key . ']';
+
+            if (is_array($value)) {
+                $query .= self::make_query_array($name, $value, $separator);
+            } elseif ($value !== null) {
+                $query .= $separator . rawurlencode($name);
+
+                if ($value !== '') {
+                    $query .= '=' . rawurlencode($value);
+                }
+
+                $separator = '&';
+            }
+        }
+
+        return $query;
     }
 
     /*
