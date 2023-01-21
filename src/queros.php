@@ -9,6 +9,8 @@ define('QUEROS', '1.0.3.0');
 */
 class Failure extends \Exception
 {
+    public $http_code;
+
     public function __construct($code, $message)
     {
         parent::__construct($message);
@@ -127,8 +129,8 @@ class Router
             if ($cache !== null) {
                 $contents =
                     '<?php ' .
-                        '$resolvers = ' . self::export($resolvers) . '; ' .
-                        '$reversers = ' . self::export($reversers) . '; ' .
+                    '$resolvers = ' . self::export($resolvers) . '; ' .
+                    '$reversers = ' . self::export($reversers) . '; ' .
                     '?>';
 
                 if (file_put_contents($cache, $contents, LOCK_EX) === false) {
@@ -148,17 +150,17 @@ class Router
 
         // Assign default callbacks
         $this->callbacks = array(
-            'call'	=> function ($request, $arguments, $function, $path = null) {
+            'call'    => function ($request, $arguments, $function, $path = null) {
                 if ($path !== null) {
                     require $path;
                 }
 
                 return call_user_func_array($function, array_merge(array($request), $arguments));
             },
-            'data'	=> function ($request, $arguments, $data = null) {
+            'data'    => function ($request, $arguments, $data = null) {
                 return $data;
             },
-            'echo'	=> function ($request, $arguments, $data, $mime = null) {
+            'echo'    => function ($request, $arguments, $data, $mime = null) {
                 if ($mime !== null) {
                     header('Content-Type: ' . $mime);
                 }
@@ -335,21 +337,21 @@ class Router
     private static function export($input)
     {
         if (is_array($input)) {
-            $out = '';
+            $output = '';
 
-            if (array_reduce(array_keys($input), function (&$result, $item) {
+            if (array_reduce(array_keys($input), function ($result, $item) {
                 return $result === $item ? $item + 1 : null;
             }, 0) !== count($input)) {
                 foreach ($input as $key => $value) {
-                    $out .= ($out !== '' ? ',' : '') . self::export($key) . '=>' . self::export($value);
+                    $output .= ($output !== '' ? ',' : '') . self::export($key) . '=>' . self::export($value);
                 }
             } else {
                 foreach ($input as $value) {
-                    $out .= ($out !== '' ? ',' : '') . self::export($value);
+                    $output .= ($output !== '' ? ',' : '') . self::export($value);
                 }
             }
 
-            return 'array(' . $out . ')';
+            return 'array(' . $output . ')';
         }
 
         return var_export($input, true);
