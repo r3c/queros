@@ -1,6 +1,6 @@
 <?php
 
-require('../src/queros.php');
+require __DIR__ . '/../src/queros.php';
 
 function handle_index($query)
 {
@@ -31,46 +31,46 @@ function handle_param_second($query)
 
 $test = new Queros\Router(array(
     array('anonymous', 'GET', 'data', 'anonymous'),
-    'callback.'	=> array('callback', array(
-        'data'		=> array('/data', 'GET', 'data', '17'),
-        'echo'		=> array('/echo', 'GET', 'echo', '17'),
-        'unknown'	=> array('/unknown', 'GET', 'unknown')
+    'callback.'    => array('callback', array(
+        'data'        => array('/data', 'GET', 'data', '17'),
+        'echo'        => array('/echo', 'GET', 'echo', '17'),
+        'unknown'    => array('/unknown', 'GET', 'unknown')
     )),
-    'escape'	=> array('<escape:/truc/>', 'GET', 'data', 'escape'),
-    'index'		=> array('(index)', 'GET', 'call', 'handle_index'),
-    'method.'	=> array('method', array(
-        'any'	=> array('/any', '', 'data'),
-        'put'	=> array('/put', 'PUT', 'data')
+    'escape'    => array('<escape:/truc/>', 'GET', 'data', 'escape'),
+    'index'        => array('(index)', 'GET', 'call', 'handle_index'),
+    'method.'    => array('method', array(
+        'any'    => array('/any', '', 'data'),
+        'put'    => array('/put', 'PUT', 'data')
     )),
-    'name.'		=> array('name', array(
-        '+append'	=> array('/append', 'GET', 'data'),
-        '!ignore'	=> array('/ignore', 'GET', 'data'),
-        '=reset'	=> array('/reset', 'GET', 'data')
+    'name.'        => array('name', array(
+        '+append'    => array('/append', 'GET', 'data'),
+        '!ignore'    => array('/ignore', 'GET', 'data'),
+        '=reset'    => array('/reset', 'GET', 'data')
     )),
-    'option1'	=> array('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
-    'option2.'	=> array('option', array(
-        'leaf1'	=> array('(/<a:\\d+>)/<b:\\d+>', 'GET', 'data', 'option2'),
-        'leaf2'	=> array('(/<a:\\d+>)/x', 'GET', 'data', 'option2'),
+    'option1'    => array('(<something>)followed by(<optional>)', '', 'call', 'handle_option'),
+    'option2.'    => array('option', array(
+        'leaf1'    => array('(/<a:\\d+>)/<b:\\d+>', 'GET', 'data', 'option2'),
+        'leaf2'    => array('(/<a:\\d+>)/x', 'GET', 'data', 'option2'),
     )),
-    'overlap1'	=> array('overlap', 'GET', 'data', 'overlap1'),
-    'overlap2.'	=> array('overlap', array(
-        'leaf'	=> array('/2', 'GET', 'data', 'overlap2')
+    'overlap1'    => array('overlap', 'GET', 'data', 'overlap1'),
+    'overlap2.'    => array('overlap', array(
+        'leaf'    => array('/2', 'GET', 'data', 'overlap2')
     )),
-    'overlap3.'	=> array('overlap', array(
-        'leaf'	=> array('/3', 'GET', 'data', 'overlap3')
+    'overlap3.'    => array('overlap', array(
+        'leaf'    => array('/3', 'GET', 'data', 'overlap3')
     )),
-    'param.'	=> array('param/', array(
-        'first'		=> array('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
-        'second'	=> array('second', 'GET,POST', 'call', 'handle_param_second')
+    'param.'    => array('param/', array(
+        'first'        => array('first-<mandatory:\\d+>(/<optional:\\d+:1>(-<string:[-0-9A-Za-z]+>))', 'GET', 'call', 'handle_param_first'),
+        'second'    => array('second', 'GET,POST', 'call', 'handle_param_second')
     )),
-    'tree.'		=> array('tree/', array(
-        '!prefix'	=> 'begin1-',
-        '!suffix'	=> '-end1',
-        'leaf'		=> array('leaf', '', 'data', 'leaf1'),
-        'node.'		=> array('node/', array(
-            '!prefix'	=> 'begin2-',
-            '!suffix'	=> '-end2',
-            'leaf'		=> array('leaf', '', 'data', 'leaf2')
+    'tree.'        => array('tree/', array(
+        '!prefix'    => 'begin1-',
+        '!suffix'    => '-end1',
+        'leaf'        => array('leaf', '', 'data', 'leaf1'),
+        'node.'        => array('node/', array(
+            '!prefix'    => 'begin2-',
+            '!suffix'    => '-end2',
+            'leaf'        => array('leaf', '', 'data', 'leaf2')
         ))
     ))
 ));
@@ -98,7 +98,9 @@ assert($test->match('GET', 'not-exists') === null);
 
 // Route resolution, standard callbacks
 assert($test->invoke('GET', 'callback/data') === '17');
-ob_start(); $test->invoke('GET', 'callback/echo'); assert(ob_get_clean() === '17');
+ob_start();
+$test->invoke('GET', 'callback/echo');
+assert(ob_get_clean() === '17');
 
 // Route resolution, unknown callback
 assert_exception(function () use ($test) {
