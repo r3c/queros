@@ -164,6 +164,52 @@ class Router
                 }
 
                 echo $data;
+            },
+            'goto' => function ($request, $route, $values = array(), $permanent = false) {
+                $parameters = array();
+
+                foreach ($values as $key => $value) {
+                    switch (substr($value, 0, 1)) {
+                        case '$': // Forward value from a parameter (either same name or specified source name)
+                            $parameters[$key] = $request->get_or_default(strlen($value) > 1 ? (string)substr($value, 1) : $key);
+
+                            break;
+
+                        case '=': // Use literal string as parameter value
+                            $parameters[$key] = (string)substr($value, 1);
+
+                            break;
+
+                        default: // Use literal string as parameter value
+                            $parameters[$key] = $value;
+
+                            break;
+                    }
+                }
+
+                $url = $request->router->url($route, $parameters);
+
+                if ($url === null) {
+                    header($_SERVER['SERVER_PROTOCOL'] . ' 500 Unknown redirection route', true, 500);
+                } else {
+                    if ($permanent) {
+                        header($_SERVER['SERVER_PROTOCOL'] . ' 301 Moved Permanently', true, 301);
+                    } else {
+                        header($_SERVER['SERVER_PROTOCOL'] . ' 302 Found', true, 302);
+                    }
+
+                    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+                        $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
+                    } elseif (isset($_SERVER['HTTP_X_SSL'])) {
+                        $scheme = $_SERVER['HTTP_X_SSL'] !== '' && $_SERVER['HTTP_X_SSL'] !== '0' ? 'https' : 'http';
+                    } elseif (isset($_SERVER['HTTPS'])) {
+                        $scheme = $_SERVER['HTTPS'] !== '' && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
+                    } else {
+                        $scheme = 'http';
+                    }
+
+                    header('Location: ' . $scheme . '://' . $_SERVER['HTTP_HOST'] . $url, true);
+                }
             }
         );
 
