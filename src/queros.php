@@ -31,7 +31,6 @@ class Failure extends \Exception
 */
 class Request
 {
-    public $arguments;
     public $method;
     public $parameters;
     public $router;
@@ -39,9 +38,8 @@ class Request
     private $callback;
     private $options;
 
-    public function __construct($router, $callback, $options, $method, $parameters, $arguments)
+    public function __construct($router, $callback, $options, $method, $parameters)
     {
-        $this->arguments = $arguments;
         $this->callback = $callback;
         $this->method = $method;
         $this->options = $options;
@@ -51,8 +49,12 @@ class Request
 
     public function invoke()
     {
-        // Invoke callback ($request, $option1, $option2, ...)
-        return call_user_func_array($this->callback, array_merge(array($this), $this->options));
+        // Invoke callback ($request, $invoke_arguments, $option1, $option2, ...)
+        return call_user_func_array($this->callback, array_merge(
+            array($this),
+            array(func_get_args()),
+            $this->options
+        ));
     }
 
     public function get_or_default($key, $value = null)
@@ -148,24 +150,24 @@ class Router
 
         // Assign default callbacks
         $this->callbacks = array(
-            'call' => function ($request, $function, $path = null) {
+            'call' => function ($request, $invoke_arguments, $function, $path = null) {
                 if ($path !== null) {
                     require $path;
                 }
 
-                return call_user_func_array($function, array_merge(array($request), $request->arguments));
+                return call_user_func_array($function, array_merge(array($request), $invoke_arguments));
             },
-            'data' => function ($request, $data = null) {
+            'data' => function ($request, $invoke_arguments, $data = null) {
                 return $data;
             },
-            'echo' => function ($request, $data, $mime = null) {
+            'echo' => function ($request, $invoke_arguments, $data, $mime = null) {
                 if ($mime !== null) {
                     header('Content-Type: ' . $mime);
                 }
 
                 echo $data;
             },
-            'goto' => function ($request, $route, $values = array(), $permanent = false) {
+            'goto' => function ($request, $invoke_arguments, $route, $values = array(), $permanent = false) {
                 $parameters = array();
 
                 foreach ($values as $key => $value) {
@@ -227,12 +229,12 @@ class Router
             throw new Failure(404, 'No route found to "' . $method . ' ' . $path . '".');
         }
 
-        return $request->invoke();
+        return call_user_func_array(array($request, 'invoke'), $arguments);
     }
 
-    public function match($method, $path, $parameters = array(), $arguments = array())
+    public function match($method, $path, $parameters = array())
     {
-        return $this->resolve($this->resolvers, strtoupper($method), $path, $parameters, $arguments);
+        return $this->resolve($this->resolvers, strtoupper($method), $path, $parameters);
     }
 
     public function register($type, $callback)
@@ -615,7 +617,7 @@ class Router
     /*
     ** Find route matching given path and method using known resolvers.
     */
-    private function resolve($resolvers, $method, $path, $parameters, $arguments)
+    private function resolve($resolvers, $method, $path, $parameters)
     {
         foreach ($resolvers as $pattern => $resolver) {
             if (preg_match($pattern, $path, $match, PREG_OFFSET_CAPTURE) !== 1) {
@@ -630,7 +632,7 @@ class Router
 
             // Node matched, continue searching recursively on children
             if ($resolver[1] === self::RESOLVE_NODE) {
-                return $this->resolve($resolver[2], $method, substr($path, strlen($match[0][0])), $parameters, $arguments);
+                return $this->resolve($resolver[2], $method, substr($path, strlen($match[0][0])), $parameters);
             }
 
             // Leaf matched, search suitable method and start processing
@@ -646,7 +648,7 @@ class Router
                     throw new \Exception('unknown callback type "' . $type . '"');
                 }
 
-                return new Request($this, $this->callbacks[$type], $options, $method, $parameters, $arguments);
+                return new Request($this, $this->callbacks[$type], $options, $method, $parameters);
             }
         }
 

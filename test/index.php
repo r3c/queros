@@ -115,9 +115,9 @@ function assert_headers($callback, $expected_headers)
 }
 
 // Register custom callback
-$test->register('custom', function ($request, $prefix, $suffix) {
-    $array = $request->arguments[0];
-    $offset = $request->arguments[1];
+$test->register('custom', function ($request, $invoke_arguments, $prefix, $suffix) {
+    $array = $invoke_arguments[0];
+    $offset = $invoke_arguments[1];
 
     return $prefix . $array[$offset] . $suffix;
 });
