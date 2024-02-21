@@ -1,6 +1,6 @@
 # Queros: QUery ROuting System
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/r3c/queros/validate.yml?branch=master)](https://github.com/r3c/queros/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/r3c/queros/verify.yml?branch=master)](https://github.com/r3c/queros/actions/workflows/verify.yml)
 [![License](https://img.shields.io/github/license/r3c/queros.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
