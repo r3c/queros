@@ -1,4 +1,4 @@
-name: Build & test
+name: Verify
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   test:
-    name: Run tests
+    name: Test with ${{ matrix.php.version }}
     runs-on: ubuntu-latest
 
     strategy:
